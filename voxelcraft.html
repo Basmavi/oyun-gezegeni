@@ -1,0 +1,2278 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VoxelCraft 3D - Gerçekçi Minecraft Deneyimi (Çok Oyunculu)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #0f172a; font-family: 'Inter', sans-serif; }
+        .pixel-font { font-family: 'Press Start 2P', cursive; }
+        canvas { display: block; width: 100%; height: 100%; }
+        
+        /* Crosshair */
+        #crosshair {
+            position: fixed; top: 50%; left: 50%; width: 20px; height: 20px;
+            transform: translate(-50%, -50%); pointer-events: none; z-index: 20;
+            mix-blend-mode: difference;
+        }
+        #crosshair::before, #crosshair::after {
+            content: ''; position: absolute; background: rgba(255, 255, 255, 0.9);
+        }
+        #crosshair::before { top: 9px; left: 0; width: 20px; height: 2px; }
+        #crosshair::after { top: 0; left: 9px; width: 2px; height: 20px; }
+
+        /* Hotbar & Slots */
+        .slot {
+            width: 48px; height: 48px; background: rgba(30, 41, 59, 0.75);
+            border: 3px solid #475569; border-radius: 6px; position: relative;
+            display: flex; align-items: center; justify-content: center;
+            transition: transform 0.1s, border-color 0.1s; cursor: pointer;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+        }
+        .slot.active {
+            border-color: #f8fafc; transform: scale(1.1);
+            box-shadow: 0 0 12px rgba(255,255,255,0.5), inset 0 2px 4px rgba(0,0,0,0.4);
+            z-index: 2;
+        }
+        .slot-count {
+            position: absolute; bottom: 2px; right: 4px; color: white;
+            font-size: 11px; font-weight: 800; text-shadow: 1px 1px 0 #000;
+        }
+        .slot-key {
+            position: absolute; top: 2px; left: 4px; color: #94a3b8;
+            font-size: 9px; font-weight: 600;
+        }
+
+        /* Damage Vignette */
+        #damage-overlay {
+            position: fixed; inset: 0; pointer-events: none; z-index: 15;
+            box-shadow: inset 0 0 80px rgba(220, 38, 38, 0);
+            transition: box-shadow 0.2s ease-out;
+        }
+        #underwater-overlay {
+            position: fixed; inset: 0; pointer-events: none; z-index: 14;
+            background: rgba(14, 116, 144, 0.45); backdrop-filter: blur(2px);
+            display: none;
+        }
+
+        /* Custom Scrollbar for Inventory */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Render Canvas -->
+    <div id="game-container" class="w-full h-full relative"></div>
+
+    <!-- Overlays -->
+    <div id="crosshair" class="hidden"></div>
+    <div id="damage-overlay"></div>
+    <div id="underwater-overlay"></div>
+
+    <!-- Top HUD (Debug / Status / Mode Switcher) -->
+    <div id="top-hud" class="hidden fixed top-3 left-3 right-3 flex justify-between items-start pointer-events-none z-20">
+        <div class="bg-slate-900/70 backdrop-blur-md border border-slate-700/80 text-white px-3 py-2 rounded-xl text-xs space-y-1 shadow-lg">
+            <div class="flex items-center gap-2">
+                <span id="hud-net-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="hud-mode" class="font-bold text-emerald-300 uppercase tracking-wider">Hayatta Kalma</span>
+                <span class="text-slate-400">|</span>
+                <span id="hud-time" class="text-amber-300 font-semibold">☀️ Gündüz</span>
+            </div>
+            <div id="hud-coords" class="text-slate-300 font-mono text-[11px]">XYZ: 0 / 0 / 0</div>
+            <div id="hud-fps" class="text-slate-400 font-mono text-[10px]">FPS: 60 | Blok: Çimen</div>
+            <div id="hud-players" class="text-sky-300 font-mono text-[10px] hidden">Çevrimiçi: 1 Oyuncu</div>
+        </div>
+
+        <div class="flex gap-2 pointer-events-auto flex-wrap justify-end">
+            <button id="btn-chat-toggle" class="hidden bg-indigo-600/90 hover:bg-indigo-500 border border-indigo-400 text-white px-3 py-2 rounded-xl text-xs font-semibold shadow-lg transition active:scale-95">
+                Sohbet (T)
+            </button>
+            <button id="btn-toggle-mode" class="bg-slate-900/80 hover:bg-slate-800 border border-slate-600 text-white px-3 py-2 rounded-xl text-xs font-semibold shadow-lg transition active:scale-95">
+                Mod Değiştir (M)
+            </button>
+            <button id="btn-open-inv" class="bg-amber-600/90 hover:bg-amber-500 border border-amber-400 text-white px-3 py-2 rounded-xl text-xs font-semibold shadow-lg transition active:scale-95">
+                Çanta / Üretim (E)
+            </button>
+            <button id="btn-pause" class="bg-slate-900/80 hover:bg-slate-800 border border-slate-600 text-white px-3 py-2 rounded-xl text-xs font-semibold shadow-lg transition active:scale-95">
+                Menü (ESC)
+            </button>
+        </div>
+    </div>
+
+    <!-- Multiplayer Chat Box -->
+    <div id="mp-chat-box" class="hidden fixed bottom-28 left-3 w-72 sm:w-80 z-20 flex flex-col gap-1.5 pointer-events-none">
+        <div id="mp-chat-log" class="max-h-36 overflow-y-auto bg-slate-950/65 backdrop-blur-sm border border-slate-800/80 rounded-xl p-2 text-xs text-white space-y-1 flex flex-col"></div>
+        <div id="mp-chat-input-wrap" class="hidden flex gap-1.5 pointer-events-auto">
+            <input id="mp-chat-input" type="text" maxlength="80" placeholder="Mesaj yaz (Enter)..." class="flex-1 bg-slate-900/90 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400">
+            <button id="mp-chat-send" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Gönder</button>
+        </div>
+    </div>
+
+    <!-- Bottom HUD (Health, Hunger, Hotbar) -->
+    <div id="bottom-hud" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20 pointer-events-none">
+        <!-- Survival Bars -->
+        <div id="survival-bars" class="w-full flex justify-between px-1">
+            <!-- Health -->
+            <div id="health-bar" class="flex gap-0.5 bg-slate-900/60 px-2 py-1 rounded-lg backdrop-blur-sm border border-slate-700/50"></div>
+            <!-- Hunger -->
+            <div id="hunger-bar" class="flex gap-0.5 bg-slate-900/60 px-2 py-1 rounded-lg backdrop-blur-sm border border-slate-700/50"></div>
+        </div>
+
+        <!-- Hotbar -->
+        <div id="hotbar" class="flex gap-1.5 bg-slate-900/80 p-1.5 rounded-xl backdrop-blur-md border border-slate-700 shadow-2xl pointer-events-auto">
+            <!-- 9 Slots generated by JS -->
+        </div>
+        <div id="selected-item-name" class="text-white text-xs font-semibold bg-slate-900/70 px-3 py-0.5 rounded-full backdrop-blur-sm border border-slate-700/60 shadow">
+            Çimen Bloğu
+        </div>
+    </div>
+
+    <!-- Mobile Touch Controls (Visible on Touch Devices) -->
+    <div id="mobile-controls" class="hidden fixed inset-0 pointer-events-none z-20">
+        <!-- Left D-Pad -->
+        <div class="fixed bottom-24 left-5 w-36 h-36 pointer-events-auto opacity-75">
+            <button data-key="KeyW" class="touch-btn absolute top-0 left-12 w-12 h-12 bg-slate-800/80 border border-slate-500 rounded-xl text-white font-bold flex items-center justify-center active:bg-slate-600">▲</button>
+            <button data-key="KeyS" class="touch-btn absolute bottom-0 left-12 w-12 h-12 bg-slate-800/80 border border-slate-500 rounded-xl text-white font-bold flex items-center justify-center active:bg-slate-600">▼</button>
+            <button data-key="KeyA" class="touch-btn absolute top-12 left-0 w-12 h-12 bg-slate-800/80 border border-slate-500 rounded-xl text-white font-bold flex items-center justify-center active:bg-slate-600">◀</button>
+            <button data-key="KeyD" class="touch-btn absolute top-12 right-0 w-12 h-12 bg-slate-800/80 border border-slate-500 rounded-xl text-white font-bold flex items-center justify-center active:bg-slate-600">▶</button>
+        </div>
+        <!-- Right Action Buttons -->
+        <div class="fixed bottom-24 right-5 flex flex-col gap-2.5 pointer-events-auto opacity-85">
+            <div class="flex gap-2.5">
+                <button id="touch-break" class="w-14 h-14 bg-rose-600/80 border border-rose-400 rounded-2xl text-white font-bold text-xs shadow-lg active:scale-95">KIR</button>
+                <button id="touch-place" class="w-14 h-14 bg-emerald-600/80 border border-emerald-400 rounded-2xl text-white font-bold text-xs shadow-lg active:scale-95">KOY</button>
+            </div>
+            <div class="flex gap-2.5 justify-end">
+                <button data-key="Space" class="touch-btn w-28 h-12 bg-slate-800/80 border border-slate-500 rounded-xl text-white font-bold text-xs shadow-lg active:bg-slate-600">ZIPLA / UÇ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inventory & Crafting Modal -->
+    <div id="inventory-modal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-30 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-slate-700 rounded-2xl max-w-2xl w-full p-5 shadow-2xl text-white flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <div>
+                    <h2 id="inv-title" class="text-lg font-extrabold text-amber-400">Envanter & Üretim Masası</h2>
+                    <p id="inv-subtitle" class="text-xs text-slate-400">Blokları üretin veya envanterinizi düzenleyin.</p>
+                </div>
+                <button id="btn-close-inv" class="bg-slate-800 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">Kapat (E)</button>
+            </div>
+
+            <!-- Crafting Section (Survival) -->
+            <div id="crafting-section" class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2">Hızlı Üretim (Crafting)</h3>
+                <div id="crafting-recipes" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <!-- Recipes injected here -->
+                </div>
+            </div>
+
+            <!-- Creative Catalog (Creative) -->
+            <div id="creative-section" class="hidden bg-slate-800/60 border border-slate-700/80 rounded-xl p-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-sky-400 mb-2">Yaratıcı Mod Blok Kataloğu (Tıkla ve Eline Al)</h3>
+                <div id="creative-items" class="grid grid-cols-5 sm:grid-cols-8 gap-2">
+                    <!-- All blocks injected here -->
+                </div>
+            </div>
+
+            <!-- Player Hotbar Mirror -->
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Hızlı Erişim Çubuğu (Seçmek için tıkla)</h3>
+                <div id="modal-hotbar" class="flex flex-wrap gap-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Menu / Pause Screen -->
+    <div id="main-menu" class="fixed inset-0 bg-gradient-to-b from-sky-950/90 via-slate-900/95 to-slate-950 z-40 flex items-center justify-center p-4 backdrop-blur-md overflow-y-auto">
+        <div class="max-w-xl w-full bg-slate-900/95 border-2 border-slate-700/80 rounded-3xl p-5 sm:p-7 shadow-2xl text-center space-y-5 my-auto">
+            <!-- Header -->
+            <div class="space-y-1">
+                <span class="inline-block px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold tracking-wider uppercase">3D Voxel Motoru v3.0 • Sunucu Destekli</span>
+                <h1 class="pixel-font text-2xl sm:text-3xl text-white tracking-wider drop-shadow-[0_4px_0_rgba(16,185,129,0.5)]">VOXELCRAFT 3D</h1>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="grid grid-cols-3 gap-1.5 bg-slate-950/90 p-1.5 rounded-2xl border border-slate-800">
+                <button id="tab-btn-offline" class="tab-btn py-2.5 px-2 rounded-xl text-xs font-extrabold transition bg-emerald-600 text-white shadow">
+                    🎮 Çevrimdışı
+                </button>
+                <button id="tab-btn-online" class="tab-btn py-2.5 px-2 rounded-xl text-xs font-extrabold transition text-slate-400 hover:text-white">
+                    🌐 Çevrimiçi
+                </button>
+                <button id="tab-btn-char" class="tab-btn py-2.5 px-2 rounded-xl text-xs font-extrabold transition text-slate-400 hover:text-white">
+                    🧑 Karakterim
+                </button>
+            </div>
+
+            <!-- TAB 1: ÇEVRİMDIŞI OYNA & DETAYLI AYARLAR -->
+            <div id="tab-offline" class="space-y-4 text-left">
+                <!-- Mode Selection Cards -->
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button id="select-survival" class="mode-card p-3 rounded-2xl border-2 border-emerald-500 bg-emerald-950/35 transition hover:bg-emerald-900/40 text-left">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs sm:text-sm font-extrabold text-emerald-400">⚔️ Hayatta Kalma</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">Kaynak topla, üretim yap, açlık ve canını koru.</p>
+                    </button>
+
+                    <button id="select-creative" class="mode-card p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/40 transition hover:bg-slate-800/80 text-left">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs sm:text-sm font-extrabold text-sky-400">✨ Yaratıcı Mod</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-600"></span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">Sınırsız blok, anında kırma ve çift zıplama ile uçma.</p>
+                    </button>
+                </div>
+
+                <!-- Advanced World & Game Settings -->
+                <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+                    <div class="text-xs font-extrabold text-amber-400 uppercase tracking-wider flex items-center justify-between">
+                        <span>⚙️ Dünya & Oyun Ayarları</span>
+                        <span class="text-[10px] text-slate-400 font-normal">Yeni dünyada geçerlidir</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 font-bold mb-1">Biyom Türü</label>
+                            <select id="set-biome" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-white font-semibold focus:outline-none focus:border-emerald-400">
+                                <option value="normal" selected>🌲 Orman & Ova</option>
+                                <option value="desert">🏜️ Çöl & Vaha</option>
+                                <option value="snow">❄️ Buzul & Karlı</option>
+                                <option value="flat">🧱 Düz Dünya (İnşaat)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] text-slate-400 font-bold mb-1">Dünya Boyutu</label>
+                            <select id="set-size" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-white font-semibold focus:outline-none focus:border-emerald-400">
+                                <option value="32">Küçük (32x32)</option>
+                                <option value="44" selected>Orta (44x44)</option>
+                                <option value="64">Büyük (64x64)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] text-slate-400 font-bold mb-1">Zaman Döngüsü</label>
+                            <select id="set-time" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-white font-semibold focus:outline-none focus:border-emerald-400">
+                                <option value="cycle" selected>🌗 Normal Döngü</option>
+                                <option value="day">☀️ Sabit Gündüz</option>
+                                <option value="night">🌙 Sabit Gece</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] text-slate-400 font-bold mb-1">Görüş Mesafesi (Sis)</label>
+                            <select id="set-fog" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-white font-semibold focus:outline-none focus:border-emerald-400">
+                                <option value="0.032">Yakın (Hızlı)</option>
+                                <option value="0.018" selected>Normal</option>
+                                <option value="0.008">Uzak (Net)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Sliders: FOV & Mouse Sensitivity -->
+                    <div class="grid grid-cols-2 gap-3 pt-1">
+                        <div>
+                            <div class="flex justify-between text-[11px] text-slate-400 font-bold mb-1">
+                                <span>Bakış Açısı (FOV)</span>
+                                <span id="val-fov" class="text-emerald-400">72°</span>
+                            </div>
+                            <input id="set-fov" type="range" min="55" max="105" value="72" class="w-full accent-emerald-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[11px] text-slate-400 font-bold mb-1">
+                                <span>Fare Hassasiyeti</span>
+                                <span id="val-sens" class="text-emerald-400">1.0x</span>
+                            </div>
+                            <input id="set-sens" type="range" min="0.4" max="2.5" step="0.1" value="1.0" class="w-full accent-emerald-500">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                        <span class="text-xs font-bold text-slate-300">🔊 Ses Efektleri</span>
+                        <input id="set-sound" type="checkbox" checked class="w-4 h-4 accent-emerald-500 rounded">
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-2.5">
+                    <button id="btn-start-game" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-extrabold py-3 px-5 rounded-2xl shadow-lg shadow-emerald-500/25 transition transform active:scale-95 text-sm">
+                        OYUNA BAŞLA / DEVAM ET
+                    </button>
+                    <button id="btn-new-world" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold py-3 px-4 rounded-2xl transition active:scale-95 text-xs">
+                        🌍 Yeni Dünya Oluştur
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB 2: ÇEVRİMİÇİ SUNUCU -->
+            <div id="tab-online" class="hidden space-y-4 text-left">
+                <div class="bg-indigo-950/40 border border-indigo-500/40 rounded-2xl p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-extrabold text-indigo-300">🌐 Çok Oyunculu Sunucu</span>
+                        <span id="net-badge" class="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-bold">Çevrimdışı</span>
+                    </div>
+
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        Aynı ağdaki veya sunucudaki arkadaşlarınla oynamak için <b>node server.js</b> çalıştırıp <b>/voxelcraft</b> adresine girin ve aynı oda kodunu yazın.
+                    </p>
+
+                    <div class="space-y-1.5">
+                        <label class="block text-[11px] font-bold text-slate-400">ODA KODU</label>
+                        <div class="flex gap-2">
+                            <input id="room-code" type="text" value="VC1" maxlength="12" placeholder="Oda Kodu" class="w-32 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-extrabold uppercase focus:outline-none focus:border-indigo-400">
+                            <button id="btn-connect-server" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold py-2.5 px-4 rounded-xl text-xs transition active:scale-95 shadow-lg shadow-indigo-600/20">
+                                Sunucuya Bağlan
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="net-status" class="text-xs text-slate-300 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                        Durum: Henüz bir odaya bağlanılmadı.
+                    </div>
+
+                    <div id="net-lobby-players" class="hidden text-xs text-emerald-300 font-mono bg-slate-950/80 p-3 rounded-xl border border-emerald-500/30"></div>
+                </div>
+
+                <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5 text-xs text-slate-300 space-y-1">
+                    <div class="font-bold text-amber-400">💡 Çok Oyunculu İpuçları:</div>
+                    <div>• Odaya ilk giren kişi <b>Oda Sahibi (Host)</b> olur ve dünya haritası onun ayarlarına göre oluşturulur.</div>
+                    <div>• Oyun içinde <b>T</b> tuşuna basarak arkadaşlarınla sohbet edebilirsin.</div>
+                </div>
+
+                <button id="btn-start-online" class="w-full bg-gradient-to-r from-indigo-500 to-sky-500 hover:from-indigo-400 hover:to-sky-400 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg transition transform active:scale-95 text-sm">
+                    DÜNYAYA GİR
+                </button>
+            </div>
+
+            <!-- TAB 3: KARAKTERİM -->
+            <div id="tab-char" class="hidden space-y-4 text-left">
+                <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row gap-4 items-center">
+                    <!-- 2D/3D Stilize Karakter Önizleme Canvas -->
+                    <div class="flex flex-col items-center gap-2 bg-slate-900 border border-slate-700 rounded-2xl p-3 shrink-0">
+                        <canvas id="char-preview-canvas" width="120" height="160" class="rounded-xl bg-gradient-to-b from-sky-900/40 to-slate-950"></canvas>
+                        <span id="preview-name-label" class="text-xs font-extrabold text-white bg-slate-800 px-3 py-0.5 rounded-full">Steve</span>
+                    </div>
+
+                    <!-- Özelleştirme Seçenekleri -->
+                    <div class="flex-1 w-full space-y-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-400 mb-1">OYUNCU ADIN</label>
+                            <input id="player-name" type="text" value="Steve" maxlength="14" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-emerald-400">
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-400 mb-1">ÜST KIYAFET RENGİ</label>
+                            <div id="player-colors" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-400 mb-1">TEN RENGİ</label>
+                                <select id="char-skin-tone" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white font-semibold">
+                                    <option value="#fcd34d" selected>Açık Buğday</option>
+                                    <option value="#f59e0b">Bronz</option>
+                                    <option value="#92400e">Koyu Kahve</option>
+                                    <option value="#86efac">Zombi Yeşili</option>
+                                    <option value="#94a3b8">Robot Grisi</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-400 mb-1">ŞAPKA / AKSESUAR</label>
+                                <select id="char-hat" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white font-semibold">
+                                    <option value="none" selected>Yok</option>
+                                    <option value="crown">👑 Altın Taç</option>
+                                    <option value="helmet">⛑️ Madenci Kaskı</option>
+                                    <option value="cap">🧢 Kırmızı Şapka</option>
+                                    <option value="glasses">🕶️ Güneş Gözlüğü</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btn-save-char" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs transition active:scale-95">
+                    ✓ Karakteri Kaydet ve Dön
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-amber-500/60 text-amber-200 px-4 py-2 rounded-full text-xs font-bold shadow-xl opacity-0 pointer-events-none transition-opacity duration-300 z-50">
+        Bildirim
+    </div>
+
+<script>
+/**
+ * VOXELCRAFT 3D - Gelişmiş Tek Dosya 3D Voxel Motoru + Çok Oyunculu Sunucu Desteği
+ */
+
+// --- 1. BLOK TANIMLARI VE PROSEDÜREL DOKU ÜRETİCİ ---
+const BLOCK_TYPES = {
+    AIR: 0,
+    GRASS: 1,
+    DIRT: 2,
+    STONE: 3,
+    WOOD: 4,
+    LEAVES: 5,
+    SAND: 6,
+    WATER: 7,
+    PLANKS: 8,
+    COBBLESTONE: 9,
+    BRICK: 10,
+    GLASS: 11,
+    COAL_ORE: 12,
+    GOLD_ORE: 13,
+    DIAMOND_ORE: 14,
+    TORCH_BLOCK: 15,
+    APPLE: 16
+};
+
+const BLOCK_DATA = {
+    [BLOCK_TYPES.GRASS]: { name: 'Çimen Bloğu', hardness: 0.6, transparent: false, drop: BLOCK_TYPES.DIRT, color: '#4ade80' },
+    [BLOCK_TYPES.DIRT]: { name: 'Toprak', hardness: 0.5, transparent: false, drop: BLOCK_TYPES.DIRT, color: '#92400e' },
+    [BLOCK_TYPES.STONE]: { name: 'Taş', hardness: 1.5, transparent: false, drop: BLOCK_TYPES.COBBLESTONE, color: '#94a3b8' },
+    [BLOCK_TYPES.WOOD]: { name: 'Meşe Kütüğü', hardness: 1.0, transparent: false, drop: BLOCK_TYPES.WOOD, color: '#78350f' },
+    [BLOCK_TYPES.LEAVES]: { name: 'Yapraklar', hardness: 0.2, transparent: true, drop: BLOCK_TYPES.APPLE, dropChance: 0.25, color: '#16a34a' },
+    [BLOCK_TYPES.SAND]: { name: 'Kum', hardness: 0.5, transparent: false, drop: BLOCK_TYPES.SAND, color: '#fde047' },
+    [BLOCK_TYPES.WATER]: { name: 'Su', hardness: 999, transparent: true, liquid: true, color: '#0284c7' },
+    [BLOCK_TYPES.PLANKS]: { name: 'Meşe Tahtası', hardness: 0.8, transparent: false, drop: BLOCK_TYPES.PLANKS, color: '#d97706' },
+    [BLOCK_TYPES.COBBLESTONE]: { name: 'Kırıktaş', hardness: 1.4, transparent: false, drop: BLOCK_TYPES.COBBLESTONE, color: '#64748b' },
+    [BLOCK_TYPES.BRICK]: { name: 'Tuğla', hardness: 1.6, transparent: false, drop: BLOCK_TYPES.BRICK, color: '#dc2626' },
+    [BLOCK_TYPES.GLASS]: { name: 'Cam', hardness: 0.3, transparent: true, drop: BLOCK_TYPES.GLASS, color: '#bae6fd' },
+    [BLOCK_TYPES.COAL_ORE]: { name: 'Kömür Cevheri', hardness: 1.8, transparent: false, drop: BLOCK_TYPES.COAL_ORE, color: '#1e293b' },
+    [BLOCK_TYPES.GOLD_ORE]: { name: 'Altın Cevheri', hardness: 2.2, transparent: false, drop: BLOCK_TYPES.GOLD_ORE, color: '#facc15' },
+    [BLOCK_TYPES.DIAMOND_ORE]: { name: 'Elmas Cevheri', hardness: 2.8, transparent: false, drop: BLOCK_TYPES.DIAMOND_ORE, color: '#22d3ee' },
+    [BLOCK_TYPES.TORCH_BLOCK]: { name: 'Işık Taşı (Fener)', hardness: 0.4, transparent: false, emissive: true, drop: BLOCK_TYPES.TORCH_BLOCK, color: '#fef08a' },
+    [BLOCK_TYPES.APPLE]: { name: 'Kırmızı Elma (Sağ Tık Ye)', hardness: 0.1, isItem: true, food: 6, heal: 4, color: '#ef4444' },
+    [BLOCK_TYPES.SNOW_BLOCK]: { name: 'Kar Bloğu', hardness: 0.4, transparent: false, drop: BLOCK_TYPES.SNOW_BLOCK, color: '#f8fafc' }
+};
+
+BLOCK_TYPES.SNOW_BLOCK = 17;
+BLOCK_DATA[BLOCK_TYPES.SNOW_BLOCK] = { name: 'Kar Bloğu', hardness: 0.4, transparent: false, drop: BLOCK_TYPES.SNOW_BLOCK, color: '#f8fafc' };
+
+const RECIPES = [
+    { out: BLOCK_TYPES.PLANKS, outCount: 4, in: BLOCK_TYPES.WOOD, inCount: 1, desc: '1 Meşe Kütüğü → 4 Meşe Tahtası' },
+    { out: BLOCK_TYPES.BRICK, outCount: 2, in: BLOCK_TYPES.COBBLESTONE, inCount: 2, desc: '2 Kırıktaş → 2 Tuğla' },
+    { out: BLOCK_TYPES.GLASS, outCount: 2, in: BLOCK_TYPES.SAND, inCount: 2, desc: '2 Kum → 2 Cam' },
+    { out: BLOCK_TYPES.TORCH_BLOCK, outCount: 2, in: BLOCK_TYPES.COAL_ORE, inCount: 1, desc: '1 Kömür Cevheri → 2 Işık Taşı' },
+    { out: BLOCK_TYPES.STONE, outCount: 2, in: BLOCK_TYPES.COBBLESTONE, inCount: 2, desc: '2 Kırıktaş → 2 Düz Taş' },
+    { out: BLOCK_TYPES.APPLE, outCount: 1, in: BLOCK_TYPES.GOLD_ORE, inCount: 1, desc: '1 Altın Cevheri → 1 Altın Elma' }
+];
+
+const SKIN_COLORS = ['#0ea5e9', '#ef4444', '#22c55e', '#eab308', '#a855f7', '#ec4899', '#f97316', '#f8fafc'];
+let selectedSkinColor = SKIN_COLORS[0];
+let selectedSkinTone = '#fcd34d';
+let selectedHat = 'none';
+
+function renderCharacterPreview() {
+    const c = document.getElementById('char-preview-canvas');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+
+    const nm = (document.getElementById('player-name')?.value || 'Steve').trim() || 'Steve';
+    document.getElementById('preview-name-label').textContent = nm;
+
+    // Gölge
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(60, 145, 28, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bacaklar (Pantolon)
+    ctx.fillStyle = '#1e3a8a';
+    ctx.fillRect(42, 102, 17, 40);
+    ctx.fillRect(61, 102, 17, 40);
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(42, 102, 17, 40);
+    ctx.strokeRect(61, 102, 17, 40);
+
+    // Gövde (Tişört)
+    ctx.fillStyle = selectedSkinColor;
+    ctx.fillRect(40, 58, 40, 44);
+    ctx.strokeRect(40, 58, 40, 44);
+
+    // Kollar
+    ctx.fillStyle = selectedSkinTone;
+    ctx.fillRect(25, 58, 15, 40);
+    ctx.fillRect(80, 58, 15, 40);
+    ctx.strokeRect(25, 58, 15, 40);
+    ctx.strokeRect(80, 58, 15, 40);
+
+    // Kafa
+    ctx.fillStyle = selectedSkinTone;
+    ctx.fillRect(42, 22, 36, 36);
+    ctx.strokeRect(42, 22, 36, 36);
+
+    // Gözler
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(48, 36, 8, 5);
+    ctx.fillRect(64, 36, 8, 5);
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(51, 36, 4, 5);
+    ctx.fillRect(65, 36, 4, 5);
+
+    // Aksesuarlar
+    if (selectedHat === 'crown') {
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.moveTo(42, 22); ctx.lineTo(42, 10); ctx.lineTo(51, 17);
+        ctx.lineTo(60, 8); ctx.lineTo(69, 17); ctx.lineTo(78, 10); ctx.lineTo(78, 22);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (selectedHat === 'helmet') {
+        ctx.fillStyle = '#eab308';
+        ctx.fillRect(40, 14, 40, 10);
+        ctx.strokeRect(40, 14, 40, 10);
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(55, 15, 10, 7);
+    } else if (selectedHat === 'cap') {
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(41, 15, 38, 8);
+        ctx.fillRect(41, 20, 46, 4);
+    } else if (selectedHat === 'glasses') {
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(46, 35, 12, 7);
+        ctx.fillRect(62, 35, 12, 7);
+        ctx.fillRect(58, 37, 4, 2);
+    }
+}
+
+const skinColorContainer = document.getElementById('player-colors');
+SKIN_COLORS.forEach((col, idx) => {
+    const btn = document.createElement('button');
+    btn.className = `w-6 h-6 rounded-full border-2 transition ${idx === 0 ? 'border-white scale-110' : 'border-transparent opacity-75'}`;
+    btn.style.backgroundColor = col;
+    btn.onclick = () => {
+        selectedSkinColor = col;
+        [...skinColorContainer.children].forEach(c => c.className = 'w-6 h-6 rounded-full border-2 border-transparent opacity-75 transition');
+        btn.className = 'w-6 h-6 rounded-full border-2 border-white scale-110 transition';
+        renderCharacterPreview();
+    };
+    skinColorContainer.appendChild(btn);
+});
+
+document.getElementById('player-name').oninput = renderCharacterPreview;
+document.getElementById('char-skin-tone').onchange = (e) => { selectedSkinTone = e.target.value; renderCharacterPreview(); };
+document.getElementById('char-hat').onchange = (e) => { selectedHat = e.target.value; renderCharacterPreview(); };
+renderCharacterPreview();
+
+// Sekme (Tab) Geçiş Mantığı
+function switchMenuTab(tabName) {
+    ['offline', 'online', 'char'].forEach(t => {
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== tabName);
+        const btn = document.getElementById('tab-btn-' + t);
+        if (t === tabName) {
+            btn.className = 'tab-btn py-2.5 px-2 rounded-xl text-xs font-extrabold transition bg-emerald-600 text-white shadow';
+        } else {
+            btn.className = 'tab-btn py-2.5 px-2 rounded-xl text-xs font-extrabold transition text-slate-400 hover:text-white';
+        }
+    });
+    if (tabName === 'char') renderCharacterPreview();
+}
+
+document.getElementById('tab-btn-offline').onclick = () => switchMenuTab('offline');
+document.getElementById('tab-btn-online').onclick = () => switchMenuTab('online');
+document.getElementById('tab-btn-char').onclick = () => switchMenuTab('char');
+document.getElementById('btn-save-char').onclick = () => {
+    showToast('✅ Karakter görünümü kaydedildi!');
+    switchMenuTab('offline');
+};
+
+const textureCache = {};
+const iconDataUrls = {};
+
+function createPixelTexture(type, face = 'side') {
+    const key = `${type}_${face}`;
+    if (textureCache[key]) return textureCache[key];
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 16;
+    canvas.height = 16;
+    const ctx = canvas.getContext('2d');
+
+    const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    const drawNoise = (baseHex, variance, density = 1) => {
+        ctx.fillStyle = baseHex;
+        ctx.fillRect(0, 0, 16, 16);
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                if (Math.random() > density) continue;
+                const v = rand(-variance, variance);
+                ctx.fillStyle = v > 0 ? `rgba(255,255,255,${v / 255})` : `rgba(0,0,0,${-v / 255})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
+    };
+
+    switch (type) {
+        case BLOCK_TYPES.GRASS:
+            if (face === 'top') {
+                drawNoise('#3b9e42', 28);
+                for(let i=0; i<18; i++) { ctx.fillStyle = '#52c459'; ctx.fillRect(rand(0,15), rand(0,15), 1, 1); }
+            } else if (face === 'bottom') {
+                drawNoise('#7c4d2b', 25);
+            } else {
+                drawNoise('#7c4d2b', 25);
+                ctx.fillStyle = '#3b9e42';
+                ctx.fillRect(0, 0, 16, 4);
+                for (let x = 0; x < 16; x++) {
+                    const drop = rand(3, 6);
+                    ctx.fillStyle = x % 2 === 0 ? '#3b9e42' : '#2f8536';
+                    ctx.fillRect(x, 0, 1, drop);
+                }
+            }
+            break;
+        case BLOCK_TYPES.DIRT:
+            drawNoise('#7c4d2b', 30);
+            break;
+        case BLOCK_TYPES.STONE:
+            drawNoise('#7f8791', 26);
+            ctx.fillStyle = 'rgba(0,0,0,0.18)';
+            ctx.fillRect(2, 4, 4, 1); ctx.fillRect(9, 11, 5, 1);
+            break;
+        case BLOCK_TYPES.COBBLESTONE:
+            drawNoise('#6b7280', 35);
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(1, 1, 6, 6); ctx.strokeRect(8, 2, 7, 5);
+            ctx.strokeRect(2, 8, 7, 7); ctx.strokeRect(10, 8, 5, 7);
+            break;
+        case BLOCK_TYPES.WOOD:
+            if (face === 'top' || face === 'bottom') {
+                drawNoise('#b4834b', 18);
+                ctx.strokeStyle = '#6b4423';
+                ctx.strokeRect(2, 2, 12, 12);
+                ctx.strokeRect(5, 5, 6, 6);
+            } else {
+                drawNoise('#5c3a21', 22);
+                for (let x = 1; x < 16; x += 3) {
+                    ctx.fillStyle = 'rgba(30,15,5,0.45)';
+                    ctx.fillRect(x, 0, 1, 16);
+                }
+            }
+            break;
+        case BLOCK_TYPES.PLANKS:
+            drawNoise('#b88446', 18);
+            ctx.fillStyle = '#6e471b';
+            ctx.fillRect(0, 3, 16, 1); ctx.fillRect(0, 7, 16, 1);
+            ctx.fillRect(0, 11, 16, 1); ctx.fillRect(0, 15, 16, 1);
+            ctx.fillRect(7, 0, 1, 3); ctx.fillRect(12, 4, 1, 3); ctx.fillRect(4, 8, 1, 3);
+            break;
+        case BLOCK_TYPES.LEAVES:
+            drawNoise('#247a2c', 35);
+            for (let i = 0; i < 24; i++) {
+                ctx.fillStyle = '#144519';
+                ctx.fillRect(rand(0, 15), rand(0, 15), 1, 1);
+            }
+            break;
+        case BLOCK_TYPES.SAND:
+            drawNoise('#e6d18a', 20);
+            break;
+        case BLOCK_TYPES.WATER:
+            drawNoise('#1d70b8', 20);
+            ctx.fillStyle = 'rgba(255,255,255,0.2)';
+            ctx.fillRect(2, 4, 5, 1); ctx.fillRect(8, 11, 6, 1);
+            break;
+        case BLOCK_TYPES.BRICK:
+            ctx.fillStyle = '#cbd5e1';
+            ctx.fillRect(0, 0, 16, 16);
+            ctx.fillStyle = '#992b2b';
+            ctx.fillRect(0, 0, 7, 3); ctx.fillRect(8, 0, 8, 3);
+            ctx.fillRect(0, 4, 3, 3); ctx.fillRect(4, 4, 7, 3); ctx.fillRect(12, 4, 4, 3);
+            ctx.fillRect(0, 8, 7, 3); ctx.fillRect(8, 8, 8, 3);
+            ctx.fillRect(0, 12, 3, 3); ctx.fillRect(4, 12, 7, 3); ctx.fillRect(12, 12, 4, 3);
+            break;
+        case BLOCK_TYPES.GLASS:
+            ctx.clearRect(0, 0, 16, 16);
+            ctx.fillStyle = 'rgba(186, 230, 253, 0.25)';
+            ctx.fillRect(0, 0, 16, 16);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.strokeRect(0.5, 0.5, 15, 15);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillRect(3, 3, 3, 1); ctx.fillRect(3, 4, 1, 2);
+            break;
+        case BLOCK_TYPES.COAL_ORE:
+        case BLOCK_TYPES.GOLD_ORE:
+        case BLOCK_TYPES.DIAMOND_ORE:
+            drawNoise('#7f8791', 24);
+            const oreColor = type === BLOCK_TYPES.COAL_ORE ? '#171717' : (type === BLOCK_TYPES.GOLD_ORE ? '#facc15' : '#22d3ee');
+            ctx.fillStyle = oreColor;
+            [[3,3],[4,3],[3,4],[10,5],[11,5],[11,6],[6,11],[7,11],[7,12],[12,12]].forEach(([x,y]) => ctx.fillRect(x,y,1,1));
+            break;
+        case BLOCK_TYPES.TORCH_BLOCK:
+            drawNoise('#fef08a', 30);
+            ctx.strokeStyle = '#d97706';
+            ctx.strokeRect(0.5, 0.5, 15, 15);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(5, 5, 6, 6);
+            break;
+        case BLOCK_TYPES.APPLE:
+            ctx.clearRect(0, 0, 16, 16);
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(4, 5, 8, 8); ctx.fillRect(3, 6, 10, 6);
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(5, 6, 3, 3);
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(7, 2, 2, 3);
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(9, 2, 3, 2);
+            break;
+        case BLOCK_TYPES.SNOW_BLOCK:
+            drawNoise('#f1f5f9', 14);
+            ctx.fillStyle = '#e2e8f0';
+            ctx.fillRect(2, 10, 5, 2); ctx.fillRect(9, 4, 4, 2);
+            break;
+    }
+
+    if (face === 'side' || face === 'icon') {
+        iconDataUrls[type] = canvas.toDataURL();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestFilter;
+    textureCache[key] = texture;
+    return texture;
+}
+
+const blockMaterials = {};
+function getBlockMaterial(type) {
+    if (blockMaterials[type]) return blockMaterials[type];
+
+    const data = BLOCK_DATA[type];
+    if (type === BLOCK_TYPES.GRASS) {
+        blockMaterials[type] = [
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'side') }),
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'side') }),
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'top') }),
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'bottom') }),
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'side') }),
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'side') }),
+        ];
+    } else if (type === BLOCK_TYPES.WOOD) {
+        blockMaterials[type] = [
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'side') }),
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'side') }),
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'top') }),
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'bottom') }),
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'side') }),
+            new THREE.MeshLambertMaterial({ map: createPixelTexture(type, 'side') }),
+        ];
+    } else if (type === BLOCK_TYPES.WATER) {
+        blockMaterials[type] = new THREE.MeshLambertMaterial({
+            map: createPixelTexture(type, 'side'),
+            transparent: true,
+            opacity: 0.72
+        });
+    } else if (type === BLOCK_TYPES.GLASS || type === BLOCK_TYPES.LEAVES) {
+        blockMaterials[type] = new THREE.MeshLambertMaterial({
+            map: createPixelTexture(type, 'side'),
+            transparent: true,
+            alphaTest: 0.1
+        });
+    } else if (data.emissive) {
+        blockMaterials[type] = new THREE.MeshBasicMaterial({
+            map: createPixelTexture(type, 'side')
+        });
+    } else {
+        blockMaterials[type] = new THREE.MeshLambertMaterial({
+            map: createPixelTexture(type, 'side')
+        });
+    }
+    return blockMaterials[type];
+}
+
+Object.keys(BLOCK_DATA).forEach(k => createPixelTexture(Number(k), 'side'));
+
+
+// --- 2. SES SENTEZLEYİCİ (TONE.JS) ---
+const SoundFX = {
+    initialized: false,
+    enabled: true,
+    synth: null,
+    noise: null,
+    init() {
+        if (this.initialized) return;
+        try {
+            Tone.start();
+            this.synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.1 }
+            }).toDestination();
+            this.synth.volume.value = -12;
+
+            this.noise = new Tone.NoiseSynth({
+                noise: { type: 'brown' },
+                envelope: { attack: 0.005, decay: 0.08, sustain: 0 }
+            }).toDestination();
+            this.noise.volume.value = -10;
+            this.initialized = true;
+        } catch (e) {}
+    },
+    playPlace() { if (this.initialized && this.enabled) this.synth.triggerAttackRelease('C4', '32n'); },
+    playBreak() { if (this.initialized && this.enabled) { this.noise.triggerAttackRelease('16n'); this.synth.triggerAttackRelease('G2', '32n'); } },
+    playEat() { if (this.initialized && this.enabled) this.synth.triggerAttackRelease(['E4', 'G4', 'C5'], '16n'); },
+    playHurt() { if (this.initialized && this.enabled) this.synth.triggerAttackRelease('A1', '8n'); },
+    playCraft() { if (this.initialized && this.enabled) this.synth.triggerAttackRelease(['C5', 'E5', 'G5'], '16n'); }
+};
+
+
+// --- 3. DÜNYA VE PERLIN BENZERİ GÜRÜLTÜ MOTORU ---
+let WORLD_SIZE = 44;
+const WORLD_HEIGHT = 24;
+const WATER_LEVEL = 6;
+let worldSeed = Math.floor(Math.random() * 10000);
+let worldBiome = 'normal'; // 'normal' | 'desert' | 'snow' | 'flat'
+let worldData = new Uint8Array(WORLD_SIZE * WORLD_HEIGHT * WORLD_SIZE);
+const blockMeshes = new Map();
+const blockEdits = new Map();
+
+function getIndex(x, y, z) {
+    return x + z * WORLD_SIZE + y * WORLD_SIZE * WORLD_SIZE;
+}
+
+function inBounds(x, y, z) {
+    return x >= 0 && x < WORLD_SIZE && y >= 0 && y < WORLD_HEIGHT && z >= 0 && z < WORLD_SIZE;
+}
+
+function getBlock(x, y, z) {
+    if (!inBounds(x, y, z)) return BLOCK_TYPES.AIR;
+    return worldData[getIndex(x, y, z)];
+}
+
+function seededRand(x, y, z, seed) {
+    const n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + seed) * 43758.5453;
+    return n - Math.floor(n);
+}
+
+function pseudoNoise2D(x, z) {
+    const s = worldSeed;
+    const n1 = Math.sin((x + s) * 0.09) * Math.cos((z + s) * 0.09);
+    const n2 = Math.sin((x - s) * 0.22 + z * 0.15) * 0.5;
+    const n3 = Math.cos(x * 0.04 - (z + s) * 0.05) * 1.4;
+    return (n1 + n2 + n3) / 2.9;
+}
+
+function generateWorldData() {
+    worldData = new Uint8Array(WORLD_SIZE * WORLD_HEIGHT * WORLD_SIZE);
+    for (let x = 0; x < WORLD_SIZE; x++) {
+        for (let z = 0; z < WORLD_SIZE; z++) {
+            if (worldBiome === 'flat') {
+                for (let y = 0; y <= 6; y++) {
+                    worldData[getIndex(x, y, z)] = y === 0 ? BLOCK_TYPES.STONE : (y < 6 ? BLOCK_TYPES.DIRT : BLOCK_TYPES.GRASS);
+                }
+                continue;
+            }
+
+            const n = pseudoNoise2D(x, z);
+            const height = Math.max(3, Math.min(WORLD_HEIGHT - 6, Math.floor(9 + n * 6)));
+
+            for (let y = 0; y <= Math.max(height, WATER_LEVEL); y++) {
+                let type = BLOCK_TYPES.AIR;
+                if (y === 0) {
+                    type = BLOCK_TYPES.STONE;
+                } else if (y < height - 3) {
+                    type = BLOCK_TYPES.STONE;
+                    const r = seededRand(x, y, z, worldSeed);
+                    if (r < 0.04) type = BLOCK_TYPES.COAL_ORE;
+                    else if (r < 0.055 && y < 7) type = BLOCK_TYPES.GOLD_ORE;
+                    else if (r < 0.062 && y < 5) type = BLOCK_TYPES.DIAMOND_ORE;
+                } else if (y < height) {
+                    if (worldBiome === 'desert') type = BLOCK_TYPES.SAND;
+                    else type = height <= WATER_LEVEL + 1 ? BLOCK_TYPES.SAND : BLOCK_TYPES.DIRT;
+                } else if (y === height) {
+                    if (worldBiome === 'desert') type = BLOCK_TYPES.SAND;
+                    else if (worldBiome === 'snow') type = height <= WATER_LEVEL + 1 ? BLOCK_TYPES.SAND : BLOCK_TYPES.SNOW_BLOCK;
+                    else type = height <= WATER_LEVEL + 1 ? BLOCK_TYPES.SAND : BLOCK_TYPES.GRASS;
+                } else if (y <= WATER_LEVEL) {
+                    type = BLOCK_TYPES.WATER;
+                }
+                worldData[getIndex(x, y, z)] = type;
+            }
+
+            // Deterministik Ağaç Oluşturma (Çöl hariç)
+            if (worldBiome !== 'desert' && height > WATER_LEVEL + 2 && x > 2 && x < WORLD_SIZE - 3 && z > 2 && z < WORLD_SIZE - 3) {
+                const tr = seededRand(x, 0, z, worldSeed + 99);
+                if (tr < 0.026) {
+                    const trunkH = 4 + Math.floor(seededRand(x, 1, z, worldSeed) * 2);
+                    for (let ty = 1; ty <= trunkH; ty++) {
+                        if (height + ty < WORLD_HEIGHT) worldData[getIndex(x, height + ty, z)] = BLOCK_TYPES.WOOD;
+                    }
+                    const leafType = worldBiome === 'snow' ? BLOCK_TYPES.SNOW_BLOCK : BLOCK_TYPES.LEAVES;
+                    for (let lx = -2; lx <= 2; lx++) {
+                        for (let lz = -2; lz <= 2; lz++) {
+                            for (let ly = trunkH - 1; ly <= trunkH + 1; ly++) {
+                                if (Math.abs(lx) === 2 && Math.abs(lz) === 2 && ly === trunkH + 1) continue;
+                                const wx = x + lx, wy = height + ly, wz = z + lz;
+                                if (inBounds(wx, wy, wz) && getBlock(wx, wy, wz) === BLOCK_TYPES.AIR) {
+                                    worldData[getIndex(wx, wy, wz)] = leafType;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+// --- 4. THREE.JS SAHNE, IŞIKLANDIRMA VE RENDER OPTİMİZASYONU ---
+const container = document.getElementById('game-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x7dd3fc);
+scene.fog = new THREE.FogExp2(0x7dd3fc, 0.018);
+
+const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 150);
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+container.appendChild(renderer.domElement);
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xfffbeb, 0.85);
+sunLight.position.set(30, 50, 20);
+scene.add(sunLight);
+
+const sunMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(5, 5, 5),
+    new THREE.MeshBasicMaterial({ color: 0xfef08a })
+);
+scene.add(sunMesh);
+
+const highlightBox = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1.015, 1.015, 1.015)),
+    new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 })
+);
+highlightBox.visible = false;
+scene.add(highlightBox);
+
+const breakOverlayMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(1.02, 1.02, 1.02),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, wireframe: false })
+);
+breakOverlayMesh.visible = false;
+scene.add(breakOverlayMesh);
+
+const sharedBoxGeo = new THREE.BoxGeometry(1, 1, 1);
+
+function isBlockExposed(x, y, z) {
+    const dirs = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+    for (const [dx, dy, dz] of dirs) {
+        const nx = x + dx, ny = y + dy, nz = z + dz;
+        if (!inBounds(nx, ny, nz)) return true;
+        const neighbor = getBlock(nx, ny, nz);
+        if (neighbor === BLOCK_TYPES.AIR || BLOCK_DATA[neighbor]?.transparent) return true;
+    }
+    return false;
+}
+
+function updateBlockVisual(x, y, z) {
+    if (!inBounds(x, y, z)) return;
+    const key = `${x},${y},${z}`;
+    const existing = blockMeshes.get(key);
+    const type = getBlock(x, y, z);
+
+    if (type === BLOCK_TYPES.AIR || !isBlockExposed(x, y, z)) {
+        if (existing) {
+            scene.remove(existing);
+            blockMeshes.delete(key);
+        }
+        return;
+    }
+
+    if (existing) {
+        existing.material = getBlockMaterial(type);
+    } else {
+        const mesh = new THREE.Mesh(sharedBoxGeo, getBlockMaterial(type));
+        mesh.position.set(x + 0.5, y + 0.5, z + 0.5);
+        mesh.userData = { bx: x, by: y, bz: z, type };
+        scene.add(mesh);
+        blockMeshes.set(key, mesh);
+    }
+}
+
+function setBlock(x, y, z, type, isNetworkSync = false) {
+    if (!inBounds(x, y, z)) return;
+    worldData[getIndex(x, y, z)] = type;
+    blockEdits.set(`${x},${y},${z}`, type);
+    updateBlockVisual(x, y, z);
+    const dirs = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+    for (const [dx, dy, dz] of dirs) {
+        updateBlockVisual(x + dx, y + dy, z + dz);
+    }
+    // Ağ üzerinden diğer oyunculara bildir
+    if (!isNetworkSync && net && net.connected) {
+        netSend({ t: 'mc_blk', x, y, z, b: type }, '*');
+    }
+}
+
+function rebuildAllVisuals() {
+    for (const mesh of blockMeshes.values()) {
+        scene.remove(mesh);
+    }
+    blockMeshes.clear();
+
+    for (let x = 0; x < WORLD_SIZE; x++) {
+        for (let y = 0; y < WORLD_HEIGHT; y++) {
+            for (let z = 0; z < WORLD_SIZE; z++) {
+                const type = getBlock(x, y, z);
+                if (type !== BLOCK_TYPES.AIR && isBlockExposed(x, y, z)) {
+                    const mesh = new THREE.Mesh(sharedBoxGeo, getBlockMaterial(type));
+                    mesh.position.set(x + 0.5, y + 0.5, z + 0.5);
+                    mesh.userData = { bx: x, by: y, bz: z, type };
+                    scene.add(mesh);
+                    blockMeshes.set(`${x},${y},${z}`, mesh);
+                }
+            }
+        }
+    }
+}
+
+
+// --- 5. ÇOK OYUNCULU SUNUCU MOTORU (SERVER.JS UYUMLU) ---
+const _k = ['1bb4f921','fdb32498','8272cc24','cbb01040','5e3c67ba','63da4cf6','a195ce6e','fc1b07eb','c6d1dcd7','b4caa6f1','bd8efa5a','9d3feb47','59fa8a4f','4db7c0e1','d7cc8bb6','deaf12d5'];
+let net = null;
+const remotePlayers = new Map(); // id -> { id, name, color, mesh, targetPos, targetYaw, lastSeen }
+
+function getSessionId() {
+    try {
+        let a = sessionStorage.getItem('mc_aid');
+        if (!a) {
+            a = 'mc_' + Math.random().toString(36).slice(2, 8);
+            sessionStorage.setItem('mc_aid', a);
+        }
+        return a;
+    } catch (e) {
+        return 'mc_' + Math.random().toString(36).slice(2, 8);
+    }
+}
+
+function verifyServer() {
+    return fetch('/verify', { method: 'POST', body: _k.join('') })
+        .then(r => r.ok ? r.text() : Promise.reject())
+        .catch(() => null);
+}
+
+function netSend(msg, to = '*') {
+    if (!net || !net.sid) return;
+    fetch('/send?r=' + encodeURIComponent(net.room) + '&id=' + net.id + '&s=' + net.sid, {
+        method: 'POST',
+        body: JSON.stringify({ ...msg, to })
+    }).catch(() => {});
+}
+
+function createNameTagSprite(name, colorHex) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    ctx.beginPath();
+    ctx.roundRect(16, 12, 224, 40, 12);
+    ctx.fill();
+    ctx.strokeStyle = colorHex || '#38bdf8';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.font = 'bold 24px Inter, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name, 128, 33);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(1.6, 0.4, 1);
+    return sprite;
+}
+
+function createRemotePlayerMesh(name, colorHex, skinTone = '#fcd34d', hat = 'none') {
+    const group = new THREE.Group();
+    const skinMat = new THREE.MeshLambertMaterial({ color: skinTone });
+    const shirtMat = new THREE.MeshLambertMaterial({ color: colorHex || '#0ea5e9' });
+    const pantsMat = new THREE.MeshLambertMaterial({ color: 0x1e3a8a });
+
+    const legGeo = new THREE.BoxGeometry(0.24, 0.65, 0.24);
+    const leftLeg = new THREE.Mesh(legGeo, pantsMat);
+    leftLeg.position.set(-0.13, 0.325, 0);
+    const rightLeg = new THREE.Mesh(legGeo, pantsMat);
+    rightLeg.position.set(0.13, 0.325, 0);
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.68, 0.26), shirtMat);
+    body.position.set(0, 0.99, 0);
+
+    const armGeo = new THREE.BoxGeometry(0.2, 0.65, 0.2);
+    const leftArm = new THREE.Mesh(armGeo, skinMat);
+    leftArm.position.set(-0.37, 0.99, 0);
+    const rightArm = new THREE.Mesh(armGeo, skinMat);
+    rightArm.position.set(0.37, 0.99, 0);
+
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), skinMat);
+    head.position.set(0, 1.56, 0);
+
+    if (hat && hat !== 'none') {
+        const hatColor = hat === 'crown' ? 0xfacc15 : (hat === 'helmet' ? 0xeab308 : (hat === 'cap' ? 0xdc2626 : 0x090d16));
+        const hatGeo = hat === 'glasses' ? new THREE.BoxGeometry(0.48, 0.12, 0.48) : new THREE.BoxGeometry(0.5, 0.16, 0.5);
+        const hatMesh = new THREE.Mesh(hatGeo, new THREE.MeshLambertMaterial({ color: hatColor }));
+        hatMesh.position.set(0, hat === 'glasses' ? 1.58 : 1.82, 0);
+        group.add(hatMesh);
+    }
+
+    const tag = createNameTagSprite(name, colorHex);
+    tag.position.set(0, 2.15, 0);
+
+    group.add(leftLeg, rightLeg, body, leftArm, rightArm, head, tag);
+    scene.add(group);
+    return { group, leftLeg, rightLeg, leftArm, rightArm };
+}
+
+function removeRemotePlayer(id) {
+    const rp = remotePlayers.get(id);
+    if (rp) {
+        scene.remove(rp.mesh.group);
+        remotePlayers.delete(id);
+        updateLobbyUI();
+        appendChatLog('Sistem', `${rp.name} oyundan ayrıldı.`, '#94a3b8');
+    }
+}
+
+function updateLobbyUI() {
+    const myName = (document.getElementById('player-name').value || 'Oyuncu').trim();
+    const names = [myName + (net?.isHost ? ' (Oda Sahibi)' : ' (Sen)')];
+    remotePlayers.forEach(p => names.push(p.name));
+
+    const lobbyEl = document.getElementById('net-lobby-players');
+    if (net && net.connected) {
+        lobbyEl.classList.remove('hidden');
+        lobbyEl.textContent = `Odadaki Oyuncular (${names.length}): ${names.join(', ')}`;
+        const hudPlayers = document.getElementById('hud-players');
+        hudPlayers.classList.remove('hidden');
+        hudPlayers.textContent = `🌐 Oda: ${net.room} | Çevrimiçi: ${names.length} Oyuncu`;
+    } else {
+        lobbyEl.classList.add('hidden');
+        document.getElementById('hud-players').classList.add('hidden');
+    }
+}
+
+function appendChatLog(sender, text, color = '#38bdf8') {
+    const box = document.getElementById('mp-chat-box');
+    const log = document.getElementById('mp-chat-log');
+    box.classList.remove('hidden');
+    const row = document.createElement('div');
+    row.innerHTML = `<strong style="color:${color}">${sender}:</strong> <span class="text-slate-100"></span>`;
+    row.querySelector('span').textContent = text;
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+}
+
+function connectToServer() {
+    const statusEl = document.getElementById('net-status');
+    const badgeEl = document.getElementById('net-badge');
+
+    if (location.protocol === 'file:') {
+        statusEl.innerHTML = '<span class="text-rose-400 font-bold">Hata:</span> Dosyayı doğrudan açtınız. Önce terminalde <b>node server.js</b> çalıştırıp tarayıcıdan <b>http://localhost:3000/minecraft</b> adresine girin.';
+        return;
+    }
+
+    statusEl.textContent = 'Sunucu doğrulanıyor...';
+    verifyServer().then(sid => {
+        if (!sid) {
+            statusEl.innerHTML = '<span class="text-rose-400 font-bold">Bağlantı Başarısız:</span> Sunucu yanıt vermedi veya doğrulama reddedildi.';
+            return;
+        }
+
+        if (net && net.es) net.es.close();
+        remotePlayers.forEach((_, id) => removeRemotePlayer(id));
+
+        const room = (document.getElementById('room-code').value || 'MC1').trim().toUpperCase();
+        const id = getSessionId();
+        const es = new EventSource('/events?r=' + encodeURIComponent(room) + '&id=' + id + '&s=' + sid);
+
+        net = { id, room, sid, es, isHost: false, connected: false };
+
+        es.onmessage = (e) => {
+            try {
+                const m = JSON.parse(e.data);
+                handleServerMessage(m);
+            } catch (err) {}
+        };
+
+        es.onerror = () => {
+            statusEl.textContent = 'Bağlantı kesildi, yeniden bağlanmaya çalışılıyor...';
+            badgeEl.textContent = 'Yeniden Bağlanıyor';
+            badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-900 text-amber-300 font-bold';
+        };
+    });
+}
+
+function handleServerMessage(m) {
+    const statusEl = document.getElementById('net-status');
+    const badgeEl = document.getElementById('net-badge');
+    const myName = (document.getElementById('player-name').value || 'Oyuncu').replace(/[<>&"']/g, '').slice(0, 14) || 'Oyuncu';
+
+    if (m.t === 'hello') {
+        net.connected = true;
+        net.isHost = (m.host === net.id);
+        badgeEl.textContent = net.isHost ? 'Oda Sahibi (Bağlı)' : 'Bağlı';
+        badgeEl.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-300 font-bold';
+        statusEl.innerHTML = net.isHost
+            ? `<b>${net.room}</b> odası kuruldu! Dünyan diğer oyuncularla paylaşılıyor.`
+            : `<b>${net.room}</b> odasına bağlandın! Dünya verisi senkronize ediliyor...`;
+
+        document.getElementById('btn-chat-toggle').classList.remove('hidden');
+        document.getElementById('mp-chat-box').classList.remove('hidden');
+
+        // Katılım bilgisi gönder
+        netSend({ t: 'mc_join', name: myName, col: selectedSkinColor, tone: selectedSkinTone, hat: selectedHat }, '*');
+        updateLobbyUI();
+        appendChatLog('Sistem', `${net.room} odasına katıldın.`, '#34d399');
+    }
+    else if (m.t === 'mc_join') {
+        if (!remotePlayers.has(m.from)) {
+            const rp = {
+                id: m.from,
+                name: m.name || 'Oyuncu',
+                color: m.col || '#0ea5e9',
+                mesh: createRemotePlayerMesh(m.name || 'Oyuncu', m.col || '#0ea5e9', m.tone, m.hat),
+                targetPos: new THREE.Vector3(WORLD_SIZE / 2, 16, WORLD_SIZE / 2),
+                targetYaw: 0,
+                isMoving: false,
+                animTime: 0
+            };
+            remotePlayers.set(m.from, rp);
+            updateLobbyUI();
+            appendChatLog('Sistem', `${rp.name} odaya katıldı!`, '#34d399');
+            showToast(`👋 ${rp.name} oyuna katıldı!`);
+        }
+        netSend({ t: 'mc_hello_peer', name: myName, col: selectedSkinColor, tone: selectedSkinTone, hat: selectedHat }, m.from);
+        if (net.isHost) {
+            const editsArray = Array.from(blockEdits.entries());
+            netSend({ t: 'mc_world', seed: worldSeed, size: WORLD_SIZE, biome: worldBiome, edits: editsArray, time: gameState.timeOfDay }, m.from);
+        }
+    }
+    else if (m.t === 'mc_hello_peer') {
+        if (!remotePlayers.has(m.from)) {
+            const rp = {
+                id: m.from,
+                name: m.name || 'Oyuncu',
+                color: m.col || '#0ea5e9',
+                mesh: createRemotePlayerMesh(m.name || 'Oyuncu', m.col || '#0ea5e9', m.tone, m.hat),
+                targetPos: new THREE.Vector3(WORLD_SIZE / 2, 16, WORLD_SIZE / 2),
+                targetYaw: 0,
+                isMoving: false,
+                animTime: 0
+            };
+            remotePlayers.set(m.from, rp);
+            updateLobbyUI();
+        }
+    }
+    else if (m.t === 'mc_world') {
+        worldSeed = m.seed;
+        WORLD_SIZE = m.size || 44;
+        worldBiome = m.biome || 'normal';
+        gameState.timeOfDay = m.time || 0.25;
+        generateWorldData();
+        blockEdits.clear();
+        if (Array.isArray(m.edits)) {
+            for (const [key, bType] of m.edits) {
+                const [bx, by, bz] = key.split(',').map(Number);
+                if (inBounds(bx, by, bz)) {
+                    worldData[getIndex(bx, by, bz)] = bType;
+                    blockEdits.set(key, bType);
+                }
+            }
+        }
+        rebuildAllVisuals();
+        spawnPlayerSafely();
+        showToast('🌍 Sunucu dünyası senkronize edildi!');
+    }
+    else if (m.t === 'mc_pos') {
+        const rp = remotePlayers.get(m.from);
+        if (rp) {
+            rp.targetPos.set(m.x, m.y, m.z);
+            rp.targetYaw = m.yaw;
+            rp.isMoving = !!m.mv;
+        }
+    }
+    else if (m.t === 'mc_blk') {
+        setBlock(m.x, m.y, m.z, m.b, true);
+    }
+    else if (m.t === 'mc_chat') {
+        const rp = remotePlayers.get(m.from);
+        appendChatLog(rp ? rp.name : 'Oyuncu', m.txt, rp ? rp.color : '#38bdf8');
+    }
+    else if (m.t === 'left') {
+        removeRemotePlayer(m.id);
+    }
+    else if (m.t === 'hostleft') {
+        showToast('⚠️ Oda sahibi ayrıldı! Sen yeni oda sahibi oldun.');
+        net.isHost = true;
+        badgeEl.textContent = 'Oda Sahibi (Bağlı)';
+        updateLobbyUI();
+    }
+}
+
+document.getElementById('btn-connect-server').onclick = connectToServer;
+
+
+// --- 6. OYUN DURUMU, FİZİK VE ENVANTER SİSTEMİ ---
+const gameState = {
+    mode: 'survival',
+    isPaused: true,
+    inventoryOpen: false,
+    chatOpen: false,
+    health: 20,
+    maxHealth: 20,
+    hunger: 20,
+    maxHunger: 20,
+    selectedSlot: 0,
+    hotbar: [
+        { type: BLOCK_TYPES.GRASS, count: 16 },
+        { type: BLOCK_TYPES.DIRT, count: 16 },
+        { type: BLOCK_TYPES.STONE, count: 16 },
+        { type: BLOCK_TYPES.WOOD, count: 8 },
+        { type: BLOCK_TYPES.PLANKS, count: 16 },
+        { type: BLOCK_TYPES.COBBLESTONE, count: 16 },
+        { type: BLOCK_TYPES.GLASS, count: 12 },
+        { type: BLOCK_TYPES.TORCH_BLOCK, count: 8 },
+        { type: BLOCK_TYPES.APPLE, count: 5 }
+    ],
+    timeOfDay: 0.25,
+    isMining: false,
+    miningProgress: 0,
+    miningTargetKey: null
+};
+
+const player = {
+    pos: new THREE.Vector3(WORLD_SIZE / 2, 16, WORLD_SIZE / 2),
+    vel: new THREE.Vector3(0, 0, 0),
+    yaw: 0,
+    pitch: 0,
+    height: 1.68,
+    radius: 0.3,
+    onGround: false,
+    isFlying: false,
+    lastSpaceTime: 0,
+    highestY: 16
+};
+
+function spawnPlayerSafely() {
+    const cx = Math.floor(WORLD_SIZE / 2);
+    const cz = Math.floor(WORLD_SIZE / 2);
+    let spawnY = WORLD_HEIGHT - 1;
+    for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
+        if (getBlock(cx, y, cz) !== BLOCK_TYPES.AIR) {
+            spawnY = y + 2;
+            break;
+        }
+    }
+    player.pos.set(cx + 0.5, spawnY, cz + 0.5);
+    player.vel.set(0, 0, 0);
+    player.highestY = spawnY;
+}
+
+function addItemToInventory(type, amount = 1) {
+    if (gameState.mode === 'creative') return;
+    for (let i = 0; i < 9; i++) {
+        if (gameState.hotbar[i] && gameState.hotbar[i].type === type && gameState.hotbar[i].count < 64) {
+            gameState.hotbar[i].count = Math.min(64, gameState.hotbar[i].count + amount);
+            renderHUD();
+            return true;
+        }
+    }
+    for (let i = 0; i < 9; i++) {
+        if (!gameState.hotbar[i] || gameState.hotbar[i].count <= 0) {
+            gameState.hotbar[i] = { type, count: amount };
+            renderHUD();
+            return true;
+        }
+    }
+    showToast('Envanter dolu!');
+    return false;
+}
+
+function consumeItemFromSlot(slotIdx, amount = 1) {
+    if (gameState.mode === 'creative') return true;
+    const item = gameState.hotbar[slotIdx];
+    if (!item || item.count < amount) return false;
+    item.count -= amount;
+    if (item.count <= 0) gameState.hotbar[slotIdx] = null;
+    renderHUD();
+    return true;
+}
+
+function hasItemCount(type, count) {
+    let total = 0;
+    for (const slot of gameState.hotbar) {
+        if (slot && slot.type === type) total += slot.count;
+    }
+    return total >= count;
+}
+
+function removeItemCount(type, count) {
+    let rem = count;
+    for (let i = 0; i < 9; i++) {
+        const slot = gameState.hotbar[i];
+        if (slot && slot.type === type) {
+            const take = Math.min(slot.count, rem);
+            slot.count -= take;
+            rem -= take;
+            if (slot.count <= 0) gameState.hotbar[i] = null;
+            if (rem <= 0) break;
+        }
+    }
+}
+
+function damagePlayer(amount) {
+    if (gameState.mode === 'creative') return;
+    gameState.health = Math.max(0, gameState.health - amount);
+    SoundFX.playHurt();
+    const overlay = document.getElementById('damage-overlay');
+    overlay.style.boxShadow = 'inset 0 0 90px rgba(220, 38, 38, 0.85)';
+    setTimeout(() => { overlay.style.boxShadow = 'inset 0 0 80px rgba(220, 38, 38, 0)'; }, 250);
+
+    if (gameState.health <= 0) {
+        showToast('💀 Öldün! Başlangıç noktasına ışınlandın.');
+        gameState.health = 20;
+        gameState.hunger = 20;
+        spawnPlayerSafely();
+    }
+    renderHUD();
+}
+
+
+// --- 7. ARAYÜZ (HUD & ENVANTER & SOHBET) GÜNCELLEME ---
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.style.opacity = '1';
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => { el.style.opacity = '0'; }, 2200);
+}
+
+function renderHUD() {
+    const modeEl = document.getElementById('hud-mode');
+    const survBars = document.getElementById('survival-bars');
+    if (gameState.mode === 'creative') {
+        modeEl.textContent = '✨ Yaratıcı Mod';
+        modeEl.className = 'font-bold text-sky-400 uppercase tracking-wider';
+        survBars.classList.add('hidden');
+    } else {
+        modeEl.textContent = '⚔️ Hayatta Kalma';
+        modeEl.className = 'font-bold text-emerald-400 uppercase tracking-wider';
+        survBars.classList.remove('hidden');
+    }
+
+    const healthBar = document.getElementById('health-bar');
+    const hungerBar = document.getElementById('hunger-bar');
+    healthBar.innerHTML = '';
+    hungerBar.innerHTML = '';
+    for (let i = 0; i < 10; i++) {
+        const hpVal = (i + 1) * 2;
+        const heart = document.createElement('span');
+        heart.className = 'text-xs';
+        heart.textContent = gameState.health >= hpVal ? '❤️' : (gameState.health >= hpVal - 1 ? '💔' : '🖤');
+        healthBar.appendChild(heart);
+
+        const food = document.createElement('span');
+        food.className = 'text-xs';
+        food.textContent = gameState.hunger >= hpVal ? '🍖' : '🦴';
+        hungerBar.appendChild(food);
+    }
+
+    const hotbarEl = document.getElementById('hotbar');
+    hotbarEl.innerHTML = '';
+    for (let i = 0; i < 9; i++) {
+        const slotItem = gameState.hotbar[i];
+        const div = document.createElement('div');
+        div.className = `slot ${gameState.selectedSlot === i ? 'active' : ''}`;
+        div.innerHTML = `<span class="slot-key">${i + 1}</span>`;
+        if (slotItem && BLOCK_DATA[slotItem.type]) {
+            const img = document.createElement('img');
+            img.src = iconDataUrls[slotItem.type];
+            img.className = 'w-7 h-7 object-contain';
+            img.style.imageRendering = 'pixelated';
+            div.appendChild(img);
+
+            if (gameState.mode === 'survival') {
+                const cnt = document.createElement('span');
+                cnt.className = 'slot-count';
+                cnt.textContent = slotItem.count;
+                div.appendChild(cnt);
+            } else {
+                const inf = document.createElement('span');
+                inf.className = 'slot-count text-sky-300';
+                inf.textContent = '∞';
+                div.appendChild(inf);
+            }
+        }
+        div.onclick = () => {
+            gameState.selectedSlot = i;
+            renderHUD();
+        };
+        hotbarEl.appendChild(div);
+    }
+
+    const activeItem = gameState.hotbar[gameState.selectedSlot];
+    document.getElementById('selected-item-name').textContent = activeItem ? BLOCK_DATA[activeItem.type].name : 'Boş El';
+}
+
+function renderInventoryModal() {
+    const craftSec = document.getElementById('crafting-section');
+    const creativeSec = document.getElementById('creative-section');
+    const modalHotbar = document.getElementById('modal-hotbar');
+
+    if (gameState.mode === 'creative') {
+        craftSec.classList.add('hidden');
+        creativeSec.classList.remove('hidden');
+        const grid = document.getElementById('creative-items');
+        grid.innerHTML = '';
+        Object.keys(BLOCK_DATA).forEach(k => {
+            const type = Number(k);
+            if (type === BLOCK_TYPES.WATER) return;
+            const btn = document.createElement('button');
+            btn.className = 'bg-slate-900 hover:bg-slate-700 border border-slate-600 rounded-xl p-2 flex flex-col items-center gap-1 transition active:scale-95';
+            btn.innerHTML = `
+                <img src="${iconDataUrls[type]}" class="w-8 h-8" style="image-rendering: pixelated;">
+                <span class="text-[10px] text-slate-300 truncate w-full text-center">${BLOCK_DATA[type].name.split(' ')[0]}</span>
+            `;
+            btn.onclick = () => {
+                gameState.hotbar[gameState.selectedSlot] = { type, count: 64 };
+                SoundFX.playPlace();
+                renderHUD();
+                renderInventoryModal();
+                showToast(`${BLOCK_DATA[type].name} seçili slota alındı.`);
+            };
+            grid.appendChild(btn);
+        });
+    } else {
+        craftSec.classList.remove('hidden');
+        creativeSec.classList.add('hidden');
+        const recipesEl = document.getElementById('crafting-recipes');
+        recipesEl.innerHTML = '';
+        RECIPES.forEach(r => {
+            const canCraft = hasItemCount(r.in, r.inCount);
+            const btn = document.createElement('button');
+            btn.className = `flex items-center justify-between p-2.5 rounded-xl border text-left transition ${
+                canCraft ? 'bg-slate-900 hover:bg-emerald-950/60 border-emerald-500/60 cursor-pointer' : 'bg-slate-900/40 border-slate-800 opacity-50 cursor-not-allowed'
+            }`;
+            btn.innerHTML = `
+                <div class="flex items-center gap-2.5">
+                    <img src="${iconDataUrls[r.out]}" class="w-8 h-8" style="image-rendering: pixelated;">
+                    <div>
+                        <div class="text-xs font-bold text-white">${BLOCK_DATA[r.out].name} (x${r.outCount})</div>
+                        <div class="text-[10px] text-slate-400">${r.desc}</div>
+                    </div>
+                </div>
+                <span class="px-2 py-1 rounded bg-emerald-600 text-[10px] font-bold text-white">ÜRET</span>
+            `;
+            btn.onclick = () => {
+                if (!hasItemCount(r.in, r.inCount)) {
+                    showToast('Yeterli malzeme yok!');
+                    return;
+                }
+                removeItemCount(r.in, r.inCount);
+                addItemToInventory(r.out, r.outCount);
+                SoundFX.playCraft();
+                renderHUD();
+                renderInventoryModal();
+                showToast(`${BLOCK_DATA[r.out].name} üretildi!`);
+            };
+            recipesEl.appendChild(btn);
+        });
+    }
+
+    modalHotbar.innerHTML = '';
+    for (let i = 0; i < 9; i++) {
+        const item = gameState.hotbar[i];
+        const div = document.createElement('div');
+        div.className = `slot ${gameState.selectedSlot === i ? 'active' : ''}`;
+        if (item) {
+            div.innerHTML = `
+                <img src="${iconDataUrls[item.type]}" class="w-7 h-7" style="image-rendering: pixelated;">
+                <span class="slot-count">${gameState.mode === 'creative' ? '∞' : item.count}</span>
+            `;
+        }
+        div.onclick = () => {
+            gameState.selectedSlot = i;
+            renderHUD();
+            renderInventoryModal();
+        };
+        modalHotbar.appendChild(div);
+    }
+}
+
+function toggleChat(forceState) {
+    if (!net || !net.connected) return;
+    gameState.chatOpen = forceState !== undefined ? forceState : !gameState.chatOpen;
+    const wrap = document.getElementById('mp-chat-input-wrap');
+    const inp = document.getElementById('mp-chat-input');
+    if (gameState.chatOpen) {
+        document.exitPointerLock?.();
+        wrap.classList.remove('hidden');
+        inp.focus();
+    } else {
+        wrap.classList.add('hidden');
+        inp.blur();
+        if (!gameState.isPaused && !gameState.inventoryOpen) {
+            renderer.domElement.requestPointerLock?.();
+        }
+    }
+}
+
+function sendChatMessage() {
+    const inp = document.getElementById('mp-chat-input');
+    const txt = inp.value.trim();
+    if (txt && net && net.connected) {
+        const myName = (document.getElementById('player-name').value || 'Oyuncu').trim();
+        appendChatLog(myName, txt, selectedSkinColor);
+        netSend({ t: 'mc_chat', txt }, '*');
+    }
+    inp.value = '';
+    toggleChat(false);
+}
+
+document.getElementById('btn-chat-toggle').onclick = () => toggleChat();
+document.getElementById('mp-chat-send').onclick = sendChatMessage;
+document.getElementById('mp-chat-input').addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') sendChatMessage();
+    if (e.key === 'Escape') toggleChat(false);
+});
+
+
+// --- 8. RAYCASTING (BLOK HEDEFLEME, KIRMA VE YERLEŞTİRME) ---
+const raycaster = new THREE.Raycaster();
+raycaster.far = 6.5;
+
+function getTargetBlock() {
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const meshes = Array.from(blockMeshes.values());
+    const hits = raycaster.intersectObjects(meshes, false);
+    for (const hit of hits) {
+        if (hit.object.userData.type !== BLOCK_TYPES.WATER) {
+            return hit;
+        }
+    }
+    return null;
+}
+
+function handleRightClickAction() {
+    if (gameState.isPaused || gameState.inventoryOpen || gameState.chatOpen) return;
+    const activeItem = gameState.hotbar[gameState.selectedSlot];
+
+    if (activeItem && activeItem.type === BLOCK_TYPES.APPLE) {
+        if (gameState.mode === 'survival' && (gameState.hunger < 20 || gameState.health < 20)) {
+            if (consumeItemFromSlot(gameState.selectedSlot, 1)) {
+                gameState.hunger = Math.min(20, gameState.hunger + 6);
+                gameState.health = Math.min(20, gameState.health + 4);
+                SoundFX.playEat();
+                renderHUD();
+                showToast('🍎 Elma yendi! Can ve açlık yenilendi.');
+            }
+        } else if (gameState.mode === 'creative') {
+            SoundFX.playEat();
+            showToast('Yaratıcı modda karnın her zaman tok!');
+        }
+        return;
+    }
+
+    const hit = getTargetBlock();
+    if (!hit || !activeItem) return;
+    if (BLOCK_DATA[activeItem.type]?.isItem) return;
+
+    const { bx, by, bz } = hit.object.userData;
+    const n = hit.face.normal;
+    const tx = bx + Math.round(n.x);
+    const ty = by + Math.round(n.y);
+    const tz = bz + Math.round(n.z);
+
+    if (!inBounds(tx, ty, tz)) return;
+
+    const px = Math.floor(player.pos.x);
+    const pyFoot = Math.floor(player.pos.y);
+    const pyHead = Math.floor(player.pos.y + 1.4);
+    const pz = Math.floor(player.pos.z);
+    if (tx === px && tz === pz && (ty === pyFoot || ty === pyHead)) return;
+
+    const existing = getBlock(tx, ty, tz);
+    if (existing === BLOCK_TYPES.AIR || existing === BLOCK_TYPES.WATER) {
+        if (consumeItemFromSlot(gameState.selectedSlot, 1)) {
+            setBlock(tx, ty, tz, activeItem.type);
+            SoundFX.playPlace();
+        }
+    }
+}
+
+function finishBreakingBlock(bx, by, bz, type) {
+    setBlock(bx, by, bz, BLOCK_TYPES.AIR);
+    SoundFX.playBreak();
+
+    if (gameState.mode === 'survival') {
+        const info = BLOCK_DATA[type];
+        if (info && info.drop) {
+            if (!info.dropChance || Math.random() <= info.dropChance) {
+                addItemToInventory(info.drop, 1);
+            }
+        }
+    }
+    gameState.miningProgress = 0;
+    gameState.miningTargetKey = null;
+    breakOverlayMesh.visible = false;
+}
+
+
+// --- 9. FİZİK VE ÇARPIŞMA MOTORU ---
+function checkCollision(pos) {
+    const r = player.radius;
+    const minX = Math.floor(pos.x - r);
+    const maxX = Math.floor(pos.x + r);
+    const minY = Math.floor(pos.y);
+    const maxY = Math.floor(pos.y + player.height);
+    const minZ = Math.floor(pos.z - r);
+    const maxZ = Math.floor(pos.z + r);
+
+    for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
+            for (let z = minZ; z <= maxZ; z++) {
+                const b = getBlock(x, y, z);
+                if (b !== BLOCK_TYPES.AIR && b !== BLOCK_TYPES.WATER) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function isPlayerInWater() {
+    const b = getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y + 0.5), Math.floor(player.pos.z));
+    return b === BLOCK_TYPES.WATER;
+}
+
+
+// --- 10. KONTROLLER (KLAVYE, FARE, DOKUNMATİK) ---
+const keys = {};
+
+window.addEventListener('keydown', (e) => {
+    if (gameState.chatOpen) return;
+    keys[e.code] = true;
+
+    if (e.code >= 'Digit1' && e.code <= 'Digit9') {
+        gameState.selectedSlot = Number(e.code.replace('Digit', '')) - 1;
+        renderHUD();
+    }
+
+    if (e.code === 'KeyE' && !gameState.isPaused) {
+        toggleInventory();
+    }
+
+    if (e.code === 'KeyT' && !gameState.isPaused && !gameState.inventoryOpen && net && net.connected) {
+        e.preventDefault();
+        toggleChat(true);
+    }
+
+    if (e.code === 'KeyM' && !gameState.isPaused && !gameState.inventoryOpen) {
+        switchGameMode(gameState.mode === 'survival' ? 'creative' : 'survival');
+    }
+
+    if (e.code === 'Space' && !gameState.isPaused && !gameState.inventoryOpen) {
+        const now = performance.now();
+        if (gameState.mode === 'creative' && now - player.lastSpaceTime < 280) {
+            player.isFlying = !player.isFlying;
+            player.vel.y = 0;
+            showToast(player.isFlying ? '🕊️ Uçuş Modu Açık' : '🚶 Uçuş Modu Kapalı');
+        }
+        player.lastSpaceTime = now;
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+    if (e.code === 'Mouse0') {
+        gameState.isMining = false;
+        gameState.miningProgress = 0;
+        breakOverlayMesh.visible = false;
+    }
+});
+
+renderer.domElement.addEventListener('click', () => {
+    SoundFX.init();
+    if (!gameState.isPaused && !gameState.inventoryOpen && !gameState.chatOpen && document.pointerLockElement !== renderer.domElement) {
+        renderer.domElement.requestPointerLock?.();
+    }
+});
+
+document.addEventListener('pointerlockchange', () => {
+    const locked = document.pointerLockElement === renderer.domElement;
+    if (!locked && !gameState.inventoryOpen && !gameState.isPaused && !gameState.chatOpen) {
+        pauseGame(true);
+    }
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (document.pointerLockElement === renderer.domElement && !gameState.isPaused && !gameState.inventoryOpen && !gameState.chatOpen) {
+        const sens = Number(document.getElementById('set-sens')?.value || 1.0);
+        player.yaw -= e.movementX * 0.0024 * sens;
+        player.pitch -= e.movementY * 0.0024 * sens;
+        player.pitch = Math.max(-Math.PI / 2 + 0.02, Math.min(Math.PI / 2 - 0.02, player.pitch));
+    }
+});
+
+window.addEventListener('mousedown', (e) => {
+    if (gameState.isPaused || gameState.inventoryOpen || gameState.chatOpen) return;
+    if (document.pointerLockElement !== renderer.domElement && !('ontouchstart' in window)) return;
+
+    if (e.button === 0) {
+        gameState.isMining = true;
+    } else if (e.button === 2) {
+        handleRightClickAction();
+    }
+});
+
+window.addEventListener('mouseup', (e) => {
+    if (e.button === 0) {
+        gameState.isMining = false;
+        gameState.miningProgress = 0;
+        breakOverlayMesh.visible = false;
+    }
+});
+
+window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+window.addEventListener('wheel', (e) => {
+    if (gameState.isPaused || gameState.inventoryOpen || gameState.chatOpen) return;
+    if (e.deltaY > 0) gameState.selectedSlot = (gameState.selectedSlot + 1) % 9;
+    else gameState.selectedSlot = (gameState.selectedSlot + 8) % 9;
+    renderHUD();
+});
+
+// Dokunmatik Kontroller
+let touchLookId = null, lastTouchX = 0, lastTouchY = 0;
+renderer.domElement.addEventListener('touchstart', (e) => {
+    SoundFX.init();
+    for (const t of e.changedTouches) {
+        if (touchLookId === null) {
+            touchLookId = t.identifier;
+            lastTouchX = t.clientX;
+            lastTouchY = t.clientY;
+        }
+    }
+}, { passive: true });
+
+renderer.domElement.addEventListener('touchmove', (e) => {
+    for (const t of e.changedTouches) {
+        if (t.identifier === touchLookId) {
+            const dx = t.clientX - lastTouchX;
+            const dy = t.clientY - lastTouchY;
+            player.yaw -= dx * 0.005;
+            player.pitch -= dy * 0.005;
+            player.pitch = Math.max(-Math.PI / 2 + 0.02, Math.min(Math.PI / 2 - 0.02, player.pitch));
+            lastTouchX = t.clientX;
+            lastTouchY = t.clientY;
+        }
+    }
+}, { passive: true });
+
+renderer.domElement.addEventListener('touchend', (e) => {
+    for (const t of e.changedTouches) {
+        if (t.identifier === touchLookId) touchLookId = null;
+    }
+});
+
+document.querySelectorAll('.touch-btn').forEach(btn => {
+    const code = btn.dataset.key;
+    btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[code] = true; });
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[code] = false; });
+});
+
+document.getElementById('touch-break').addEventListener('touchstart', (e) => { e.preventDefault(); gameState.isMining = true; });
+document.getElementById('touch-break').addEventListener('touchend', (e) => { e.preventDefault(); gameState.isMining = false; gameState.miningProgress = 0; breakOverlayMesh.visible = false; });
+document.getElementById('touch-place').addEventListener('touchstart', (e) => { e.preventDefault(); handleRightClickAction(); });
+
+
+// --- 11. MENÜ VE MOD YÖNETİMİ ---
+function switchGameMode(newMode) {
+    gameState.mode = newMode;
+    if (newMode === 'survival') {
+        player.isFlying = false;
+        player.highestY = player.pos.y;
+    }
+    renderHUD();
+    if (gameState.inventoryOpen) renderInventoryModal();
+    showToast(newMode === 'creative' ? '✨ Yaratıcı Mod Aktif!' : '⚔️ Hayatta Kalma Modu Aktif!');
+}
+
+function toggleInventory() {
+    gameState.inventoryOpen = !gameState.inventoryOpen;
+    const modal = document.getElementById('inventory-modal');
+    if (gameState.inventoryOpen) {
+        document.exitPointerLock?.();
+        modal.classList.remove('hidden');
+        renderInventoryModal();
+    } else {
+        modal.classList.add('hidden');
+        renderer.domElement.requestPointerLock?.();
+    }
+}
+
+function pauseGame(pause) {
+    gameState.isPaused = pause;
+    const menu = document.getElementById('main-menu');
+    const topHud = document.getElementById('top-hud');
+    const bottomHud = document.getElementById('bottom-hud');
+    const crosshair = document.getElementById('crosshair');
+
+    if (pause) {
+        menu.classList.remove('hidden');
+        topHud.classList.add('hidden');
+        bottomHud.classList.add('hidden');
+        crosshair.classList.add('hidden');
+    } else {
+        menu.classList.add('hidden');
+        topHud.classList.remove('hidden');
+        bottomHud.classList.remove('hidden');
+        crosshair.classList.remove('hidden');
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            document.getElementById('mobile-controls').classList.remove('hidden');
+        }
+        renderer.domElement.requestPointerLock?.();
+        renderHUD();
+    }
+}
+
+document.getElementById('select-survival').onclick = () => {
+    switchGameMode('survival');
+    document.getElementById('select-survival').className = 'mode-card p-3 rounded-2xl border-2 border-emerald-500 bg-emerald-950/35 transition text-left';
+    document.getElementById('select-creative').className = 'mode-card p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/40 transition text-left';
+};
+
+document.getElementById('select-creative').onclick = () => {
+    switchGameMode('creative');
+    document.getElementById('select-creative').className = 'mode-card p-3 rounded-2xl border-2 border-sky-500 bg-sky-950/35 transition text-left';
+    document.getElementById('select-survival').className = 'mode-card p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/40 transition text-left';
+};
+
+// Menü Ayar Dinleyicileri
+document.getElementById('set-fov').oninput = (e) => {
+    const v = Number(e.target.value);
+    document.getElementById('val-fov').textContent = v + '°';
+    camera.fov = v;
+    camera.updateProjectionMatrix();
+};
+
+document.getElementById('set-sens').oninput = (e) => {
+    document.getElementById('val-sens').textContent = Number(e.target.value).toFixed(1) + 'x';
+};
+
+document.getElementById('set-fog').onchange = (e) => {
+    scene.fog.density = Number(e.target.value);
+};
+
+document.getElementById('set-sound').onchange = (e) => {
+    SoundFX.enabled = e.target.checked;
+};
+
+document.getElementById('btn-start-game').onclick = () => {
+    SoundFX.init();
+    pauseGame(false);
+};
+
+document.getElementById('btn-start-online').onclick = () => {
+    SoundFX.init();
+    if (!net || !net.connected) {
+        showToast('⚠️ Önce Sunucuya Bağlan butonuna bas!');
+        return;
+    }
+    pauseGame(false);
+};
+
+document.getElementById('btn-new-world').onclick = () => {
+    SoundFX.init();
+    worldSeed = Math.floor(Math.random() * 10000);
+    worldBiome = document.getElementById('set-biome').value;
+    WORLD_SIZE = Number(document.getElementById('set-size').value);
+    blockEdits.clear();
+    generateWorldData();
+    rebuildAllVisuals();
+    spawnPlayerSafely();
+    gameState.health = 20;
+    gameState.hunger = 20;
+    if (net && net.connected && net.isHost) {
+        netSend({ t: 'mc_world', seed: worldSeed, size: WORLD_SIZE, biome: worldBiome, edits: [], time: gameState.timeOfDay }, '*');
+    }
+    pauseGame(false);
+    showToast('🌍 Yeni dünya oluşturuldu!');
+};
+
+document.getElementById('btn-toggle-mode').onclick = () => switchGameMode(gameState.mode === 'survival' ? 'creative' : 'survival');
+document.getElementById('btn-open-inv').onclick = () => toggleInventory();
+document.getElementById('btn-close-inv').onclick = () => toggleInventory();
+document.getElementById('btn-pause').onclick = () => { document.exitPointerLock?.(); pauseGame(true); };
+
+
+// --- 12. ANA OYUN DÖNGÜSÜ (UPDATE & RENDER) ---
+let lastTime = performance.now();
+let frameCount = 0;
+let fpsTimer = 0;
+let hungerTimer = 0;
+let netSyncTimer = 0;
+
+function updateDayNightCycle(dt) {
+    const timeSetting = document.getElementById('set-time')?.value || 'cycle';
+    if (timeSetting === 'day') {
+        gameState.timeOfDay = 0.25;
+    } else if (timeSetting === 'night') {
+        gameState.timeOfDay = 0.75;
+    } else {
+        gameState.timeOfDay = (gameState.timeOfDay + dt * 0.004) % 1;
+    }
+    const angle = gameState.timeOfDay * Math.PI * 2;
+    const sunY = Math.sin(angle);
+    const sunX = Math.cos(angle);
+
+    sunLight.position.set(sunX * 45 + WORLD_SIZE / 2, sunY * 45, 25);
+    sunMesh.position.copy(sunLight.position);
+
+    const dayFactor = Math.max(0.12, Math.min(1, (sunY + 0.3) * 1.1));
+    ambientLight.intensity = 0.22 + dayFactor * 0.5;
+    sunLight.intensity = Math.max(0, sunY) * 0.9;
+
+    const skyColor = new THREE.Color().setHSL(0.56, 0.72, 0.1 + dayFactor * 0.52);
+    scene.background = skyColor;
+    scene.fog.color = skyColor;
+
+    const timeEl = document.getElementById('hud-time');
+    if (sunY > 0.2) timeEl.textContent = '☀️ Gündüz';
+    else if (sunY > -0.2) timeEl.textContent = '🌅 Alacakaranlık';
+    else timeEl.textContent = '🌙 Gece';
+}
+
+function updatePlayerPhysics(dt) {
+    const euler = new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ');
+    camera.quaternion.setFromEuler(euler);
+
+    const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.yaw);
+    const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.yaw);
+    const moveDir = new THREE.Vector3();
+
+    if (keys['KeyW']) moveDir.add(forward);
+    if (keys['KeyS']) moveDir.sub(forward);
+    if (keys['KeyD']) moveDir.add(right);
+    if (keys['KeyA']) moveDir.sub(right);
+    const isMoving = moveDir.lengthSq() > 0;
+    if (isMoving) moveDir.normalize();
+
+    const inWater = isPlayerInWater();
+    document.getElementById('underwater-overlay').style.display = inWater ? 'block' : 'none';
+
+    const speed = player.isFlying ? 11.0 : (inWater ? 3.5 : 5.6);
+    player.vel.x = moveDir.x * speed;
+    player.vel.z = moveDir.z * speed;
+
+    if (player.isFlying) {
+        player.vel.y = 0;
+        if (keys['Space']) player.vel.y = 7.5;
+        if (keys['ShiftLeft']) player.vel.y = -7.5;
+    } else if (inWater) {
+        player.vel.y -= 6.0 * dt;
+        player.vel.y = Math.max(-3.0, player.vel.y);
+        if (keys['Space']) player.vel.y = 4.2;
+    } else {
+        player.vel.y -= 22.0 * dt;
+        if (keys['Space'] && player.onGround) {
+            player.vel.y = 7.8;
+            player.onGround = false;
+        }
+    }
+
+    const nextX = player.pos.clone();
+    nextX.x += player.vel.x * dt;
+    if (!checkCollision(nextX) && nextX.x > 0.5 && nextX.x < WORLD_SIZE - 0.5) {
+        player.pos.x = nextX.x;
+    }
+
+    const nextZ = player.pos.clone();
+    nextZ.z += player.vel.z * dt;
+    if (!checkCollision(nextZ) && nextZ.z > 0.5 && nextZ.z < WORLD_SIZE - 0.5) {
+        player.pos.z = nextZ.z;
+    }
+
+    const nextY = player.pos.clone();
+    nextY.y += player.vel.y * dt;
+    if (!checkCollision(nextY)) {
+        player.pos.y = nextY.y;
+        player.onGround = false;
+        if (player.pos.y > player.highestY) player.highestY = player.pos.y;
+    } else {
+        if (player.vel.y < 0) {
+            const fallDist = player.highestY - player.pos.y;
+            if (gameState.mode === 'survival' && !inWater && fallDist > 4.2) {
+                const dmg = Math.floor(fallDist - 3.5);
+                if (dmg > 0) damagePlayer(dmg);
+            }
+            player.onGround = true;
+            player.highestY = player.pos.y;
+        }
+        player.vel.y = 0;
+    }
+
+    if (player.pos.y < -5) spawnPlayerSafely();
+
+    camera.position.set(player.pos.x, player.pos.y + 1.52, player.pos.z);
+
+    // Sunucuya pozisyon gönderimi (Saniyede ~12 kez)
+    if (net && net.connected) {
+        netSyncTimer += dt;
+        if (netSyncTimer >= 0.08) {
+            netSyncTimer = 0;
+            netSend({
+                t: 'mc_pos',
+                x: Number(player.pos.x.toFixed(2)),
+                y: Number(player.pos.y.toFixed(2)),
+                z: Number(player.pos.z.toFixed(2)),
+                yaw: Number(player.yaw.toFixed(2)),
+                mv: isMoving ? 1 : 0
+            }, '*');
+        }
+    }
+
+    if (gameState.mode === 'survival') {
+        hungerTimer += dt;
+        if (hungerTimer >= 14) {
+            hungerTimer = 0;
+            if (gameState.hunger > 0) {
+                gameState.hunger = Math.max(0, gameState.hunger - 1);
+                if (gameState.hunger >= 16 && gameState.health < 20) {
+                    gameState.health = Math.min(20, gameState.health + 1);
+                }
+            } else {
+                damagePlayer(1);
+            }
+            renderHUD();
+        }
+    }
+}
+
+function updateRemotePlayers(dt) {
+    remotePlayers.forEach(rp => {
+        rp.mesh.group.position.lerp(rp.targetPos, Math.min(1, dt * 12));
+        rp.mesh.group.rotation.y = rp.targetYaw + Math.PI;
+
+        if (rp.isMoving) {
+            rp.animTime += dt * 10;
+            const swing = Math.sin(rp.animTime) * 0.6;
+            rp.mesh.leftLeg.rotation.x = swing;
+            rp.mesh.rightLeg.rotation.x = -swing;
+            rp.mesh.leftArm.rotation.x = -swing;
+            rp.mesh.rightArm.rotation.x = swing;
+        } else {
+            rp.mesh.leftLeg.rotation.x = 0;
+            rp.mesh.rightLeg.rotation.x = 0;
+            rp.mesh.leftArm.rotation.x = 0;
+            rp.mesh.rightArm.rotation.x = 0;
+        }
+    });
+}
+
+function updateInteractionAndMining(dt) {
+    const hit = getTargetBlock();
+    const coordsEl = document.getElementById('hud-coords');
+    const fpsEl = document.getElementById('hud-fps');
+
+    coordsEl.textContent = `XYZ: ${Math.floor(player.pos.x)} / ${Math.floor(player.pos.y)} / ${Math.floor(player.pos.z)}`;
+
+    if (hit) {
+        const { bx, by, bz, type } = hit.object.userData;
+        highlightBox.position.set(bx + 0.5, by + 0.5, bz + 0.5);
+        highlightBox.visible = true;
+        fpsEl.dataset.targetName = BLOCK_DATA[type]?.name || '';
+
+        if (gameState.isMining) {
+            const key = `${bx},${by},${bz}`;
+            if (gameState.miningTargetKey !== key) {
+                gameState.miningTargetKey = key;
+                gameState.miningProgress = 0;
+            }
+
+            if (gameState.mode === 'creative') {
+                finishBreakingBlock(bx, by, bz, type);
+            } else {
+                const hardness = BLOCK_DATA[type]?.hardness || 1.0;
+                gameState.miningProgress += dt / hardness;
+                breakOverlayMesh.position.set(bx + 0.5, by + 0.5, bz + 0.5);
+                breakOverlayMesh.material.opacity = Math.min(0.65, gameState.miningProgress * 0.65);
+                breakOverlayMesh.visible = true;
+
+                if (gameState.miningProgress >= 1.0) {
+                    finishBreakingBlock(bx, by, bz, type);
+                }
+            }
+        }
+    } else {
+        highlightBox.visible = false;
+        breakOverlayMesh.visible = false;
+        gameState.miningProgress = 0;
+        fpsEl.dataset.targetName = 'Gökyüzü';
+    }
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - lastTime) / 1000);
+    lastTime = now;
+
+    frameCount++;
+    fpsTimer += dt;
+    if (fpsTimer >= 0.5) {
+        const fps = Math.round(frameCount / fpsTimer);
+        const fpsEl = document.getElementById('hud-fps');
+        fpsEl.textContent = `FPS: ${fps} | Hedef: ${fpsEl.dataset.targetName || '-'}`;
+        frameCount = 0;
+        fpsTimer = 0;
+    }
+
+    updateDayNightCycle(dt);
+    updateRemotePlayers(dt);
+
+    if (!gameState.isPaused && !gameState.inventoryOpen && !gameState.chatOpen) {
+        updatePlayerPhysics(dt);
+        updateInteractionAndMining(dt);
+    }
+
+    renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+window.onload = function () {
+    generateWorldData();
+    rebuildAllVisuals();
+    spawnPlayerSafely();
+    renderHUD();
+    animate();
+};
+</script>
+</body>
+</html>

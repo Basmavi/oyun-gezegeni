@@ -1,0 +1,1809 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Crown Clash 19 - Termux Doğrulamalı Lobi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        royal: {
+                            dark: '#090d16',
+                            card: '#131c31',
+                            accent: '#f59e0b'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            overscroll-behavior: none;
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090d16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 2px;
+        }
+        .text-glow {
+            text-shadow: 0 0 16px rgba(245, 158, 11, 0.8), 0 0 32px rgba(245, 158, 11, 0.4);
+        }
+        .box-glow {
+            box-shadow: 0 0 30px rgba(245, 158, 11, 0.35);
+        }
+        canvas {
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-[100dvh] flex flex-col justify-between overflow-hidden">
+
+    <header class="w-full bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-4 py-2 flex items-center justify-between z-20 shrink-0">
+        <div class="flex items-center space-x-2.5">
+            <div class="bg-gradient-to-br from-amber-500 to-yellow-600 p-2 rounded-xl shadow-lg box-glow">
+                <i class="fa-solid fa-chess-rook text-slate-950 text-sm font-black"></i>
+            </div>
+            <div>
+                <h1 class="text-sm font-black tracking-wider bg-gradient-to-r from-amber-400 via-yellow-200 to-amber-500 bg-clip-text text-transparent uppercase">Crown Clash 19</h1>
+                <p class="text-[9px] text-slate-400 font-semibold">20 Harita & Termux Token Uyumlu</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <div class="bg-slate-800/90 border border-amber-500/40 px-2.5 py-1 rounded-xl flex items-center space-x-1.5 shadow-md">
+                <span class="text-amber-400 text-xs">🪙</span>
+                <span id="goldDisplay" class="font-black text-xs text-amber-300">500</span>
+            </div>
+            <button onclick="openRulesModal()" class="bg-slate-800 active:bg-slate-700 text-slate-300 font-semibold p-1.5 rounded-xl border border-slate-700 transition text-xs shadow">
+                <i class="fa-solid fa-circle-question"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 w-full max-w-md mx-auto flex flex-col items-center justify-center p-2 relative overflow-hidden">
+
+        <div id="mainMenuScreen" class="w-full flex flex-col h-full z-10 max-w-md overflow-hidden">
+            <div class="grid grid-cols-5 gap-1 bg-slate-900 p-1 rounded-2xl border border-slate-800 mb-2 shrink-0">
+                <button onclick="switchTab('battle')" id="tab-btn-battle" class="menu-tab py-2 rounded-xl text-[9px] font-bold bg-amber-600 text-white transition shadow flex flex-col items-center">
+                    <i class="fa-solid fa-swords text-xs mb-0.5"></i> Savaş
+                </button>
+                <button onclick="switchTab('lobby')" id="tab-btn-lobby" class="menu-tab py-2 rounded-xl text-[9px] font-bold text-slate-400 hover:text-white transition flex flex-col items-center">
+                    <i class="fa-solid fa-globe text-xs mb-0.5"></i> Lobi
+                </button>
+                <button onclick="switchTab('decks')" id="tab-btn-decks" class="menu-tab py-2 rounded-xl text-[9px] font-bold text-slate-400 hover:text-white transition flex flex-col items-center">
+                    <i class="fa-solid fa-layer-group text-xs mb-0.5"></i> Desteler
+                </button>
+                <button onclick="switchTab('workshop')" id="tab-btn-workshop" class="menu-tab py-2 rounded-xl text-[9px] font-bold text-slate-400 hover:text-white transition flex flex-col items-center">
+                    <i class="fa-solid fa-hammer text-xs mb-0.5"></i> Atölye
+                </button>
+                <button onclick="switchTab('saves')" id="tab-btn-saves" class="menu-tab py-2 rounded-xl text-[9px] font-bold text-slate-400 hover:text-white transition flex flex-col items-center">
+                    <i class="fa-solid fa-floppy-disk text-xs mb-0.5"></i> Kayıtlar
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-3 pr-1 pb-2">
+                
+                <div id="tab-content-battle" class="space-y-3">
+                    <div class="text-center space-y-0.5">
+                        <h2 class="text-base font-black text-white tracking-wide">SAVAŞA HAZIRLAN</h2>
+                        <p class="text-[10px] text-slate-400">20 arena, 3 dk süre ve destenle savaşa gir!</p>
+                    </div>
+
+                    <div class="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 shadow-xl space-y-1.5">
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">Oyun Modu</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="setGameMode('pve')" id="btn-mode-pve" class="mode-btn py-2 px-2 rounded-xl font-bold text-xs bg-amber-600 text-white border border-amber-500 shadow-lg active:scale-95 transition flex items-center justify-center space-x-1.5">
+                                <i class="fa-solid fa-robot"></i>
+                                <span>Tek Kişilik (AI)</span>
+                            </button>
+                            <button onclick="setGameMode('pvp')" id="btn-mode-pvp" class="mode-btn py-2 px-2 rounded-xl font-bold text-xs bg-slate-800 text-slate-300 border border-slate-700 active:scale-95 transition flex items-center justify-center space-x-1.5">
+                                <i class="fa-solid fa-user-group"></i>
+                                <span>2 Kişilik (Cihazda)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 shadow-xl space-y-1.5">
+                        <div class="flex justify-between items-center px-1">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Harita Seçimi (20 Arena)</span>
+                            <span id="selectedMapLabel" class="text-[10px] text-amber-400 font-bold">Klasik Çayır</span>
+                        </div>
+                        <div class="grid grid-cols-5 gap-1.5 max-h-40 overflow-y-auto p-0.5" id="mapGridContainer"></div>
+                    </div>
+
+                    <div id="aiDifficultyContainer" class="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 shadow-xl space-y-1.5">
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">Yapay Zeka Zorluğu</label>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <button onclick="setDifficulty('kolay')" id="btn-diff-kolay" class="diff-btn py-1.5 px-1 rounded-xl font-bold text-xs bg-slate-800 text-slate-300 border border-slate-700 active:scale-95 transition flex flex-col items-center">
+                                <span class="text-emerald-400">Kolay</span>
+                            </button>
+                            <button onclick="setDifficulty('orta')" id="btn-diff-orta" class="diff-btn py-1.5 px-1 rounded-xl font-bold text-xs bg-amber-600 text-white border border-amber-500 active:scale-95 transition flex flex-col items-center shadow-lg">
+                                <span class="text-yellow-200">Orta</span>
+                            </button>
+                            <button onclick="setDifficulty('zor')" id="btn-diff-zor" class="diff-btn py-1.5 px-1 rounded-xl font-bold text-xs bg-slate-800 text-slate-300 border border-slate-700 active:scale-95 transition flex flex-col items-center">
+                                <span class="text-rose-400">Zor</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button onclick="startGame()" class="w-full py-3 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 active:from-amber-400 text-slate-950 font-black text-xs rounded-2xl shadow-xl box-glow transform active:scale-95 transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-play text-sm"></i>
+                        <span>SAVAŞI BAŞLAT (3 DK)</span>
+                    </button>
+                </div>
+
+                <div id="tab-content-lobby" class="space-y-3 hidden">
+                    <div class="text-center space-y-0.5">
+                        <h2 class="text-sm font-black text-white">Termux Lobi (Online)</h2>
+                        <p class="text-[9px] text-slate-400">Otomatik /verify doğrulamalı sunucu lobisi</p>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 space-y-2.5 shadow-xl">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 mb-1">Oda Kodu</label>
+                            <input type="text" id="lobbyRoomInput" value="ARENA1" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-bold uppercase" />
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <button onclick="joinLobbyRoom()" class="py-2.5 bg-amber-600 active:bg-amber-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center justify-center space-x-1.5 transition">
+                                <i class="fa-solid fa-plug"></i>
+                                <span>Odaya Bağlan</span>
+                            </button>
+                            <button onclick="leaveLobbyRoom()" class="py-2.5 bg-slate-800 active:bg-slate-700 text-rose-400 border border-rose-600/50 font-bold text-xs rounded-xl shadow flex items-center justify-center space-x-1.5 transition">
+                                <i class="fa-solid fa-door-open"></i>
+                                <span>Ayrıl</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 shadow-xl space-y-2.5">
+                        <div class="flex justify-between items-center text-[11px] font-bold border-b border-slate-800 pb-1.5">
+                            <span class="text-slate-300">Durum: <span id="lobbyConnStatus" class="text-rose-400">Bağlı Değil</span></span>
+                            <span id="lobbyRoleBadge" class="text-purple-300 text-[10px] bg-purple-950/70 px-2 py-0.5 rounded border border-purple-700">-</span>
+                        </div>
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-bold text-slate-400">Odadakiler:</span>
+                            <div id="lobbyPlayersBox" class="bg-slate-800 border border-slate-700 rounded-xl p-2 text-xs text-slate-300 min-h-[42px] flex flex-wrap gap-1.5 items-center">
+                                Oda seçilmedi.
+                            </div>
+                        </div>
+                        <button id="hostStartOnlineBtn" onclick="hostStartOnlineMatch()" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 active:from-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg hidden transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-swords"></i>
+                            <span>ONLINE SAVAŞI BAŞLAT (HOST)</span>
+                        </button>
+                        <p id="guestWaitMsg" class="text-[10px] text-center text-amber-400 font-semibold hidden">Host maçı başlatana kadar bekleniyor...</p>
+                    </div>
+                </div>
+
+                <div id="tab-content-decks" class="space-y-3 hidden">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h2 class="text-sm font-black text-white">Deste Yönetimi (10 Deste)</h2>
+                            <p class="text-[9px] text-slate-400">Her destede tam 8 kart olmalıdır.</p>
+                        </div>
+                        <div class="bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700 text-[10px] font-bold text-amber-400">
+                            Ort. İksir: <span id="avgElixirDisplay">3.5</span> ⚡
+                        </div>
+                    </div>
+
+                    <div class="flex space-x-1 overflow-x-auto pb-1" id="deckSelectorContainer"></div>
+
+                    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 shadow-xl space-y-2">
+                        <div class="flex justify-between items-center text-[10px] font-bold text-slate-300">
+                            <span>Aktif Deste Kartları (<span id="deckCardCount">8</span>/8)</span>
+                            <span class="text-purple-400" id="activeDeckName">Deste 1</span>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2" id="activeDeckSlots"></div>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 shadow-xl space-y-2">
+                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Koleksiyon (Eklemek için tıkla)</span>
+                        <div class="grid grid-cols-4 gap-2 max-h-52 overflow-y-auto p-1" id="collectionCardsGrid"></div>
+                    </div>
+                </div>
+
+                <div id="tab-content-workshop" class="space-y-3 hidden">
+                    <div class="text-center space-y-0.5">
+                        <h2 class="text-sm font-black text-white">Geliştirme Atölyesi</h2>
+                        <p class="text-[9px] text-slate-400">Kulelerini ve kartlarını altın harcayarak güçlendir.</p>
+                    </div>
+                    <div id="upgradesListContainer" class="space-y-2"></div>
+                </div>
+
+                <div id="tab-content-saves" class="space-y-3 hidden">
+                    <div class="text-center space-y-0.5">
+                        <h2 class="text-sm font-black text-white">Kayıt Sistemi (.crown)</h2>
+                        <p class="text-[9px] text-slate-400">İlerlemeni kaydet ve dilediğin zaman yükle.</p>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 space-y-2.5 shadow-xl">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 mb-1">Oyuncu Adı</label>
+                            <input type="text" id="usernameInput" value="Savaşçı" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-semibold" />
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <button onclick="saveGameFileNew()" class="py-2.5 bg-amber-600 active:bg-amber-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center justify-center space-x-1.5 transition">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                                <span>Yeni Kaydet</span>
+                            </button>
+                            <button onclick="saveGameFileOverwrite()" class="py-2.5 bg-slate-800 active:bg-slate-700 text-amber-400 border border-amber-600/50 font-bold text-xs rounded-xl shadow flex items-center justify-center space-x-1.5 transition">
+                                <i class="fa-solid fa-file-arrow-up"></i>
+                                <span>Üstüne Yaz</span>
+                            </button>
+                        </div>
+
+                        <label class="w-full py-2.5 bg-slate-800 active:bg-slate-700 text-emerald-400 border border-emerald-500/40 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 shadow cursor-pointer transition">
+                            <i class="fa-solid fa-folder-open"></i>
+                            <span>Kayıt Dosyası Seç (.crown)</span>
+                            <input type="file" id="loadFileInput" accept=".crown" onchange="loadGameFile(event)" class="hidden" />
+                        </label>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-3 shadow-xl space-y-1.5">
+                        <div class="flex justify-between items-center text-[10px]">
+                            <span class="text-slate-400 font-bold">Toplam Zafer: <strong id="totalWinsDisplay" class="text-amber-400">0</strong></span>
+                            <span id="nextUnlockDisplay" class="text-purple-300 font-semibold">Sıradaki Kilit: 30 Maç</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
+                            <div id="unlockProgressBar" class="bg-gradient-to-r from-amber-500 to-purple-500 h-full rounded-full transition-all duration-300" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div id="battleScreen" class="w-full hidden flex flex-col items-center justify-between h-full py-1">
+            <div class="w-full space-y-1 shrink-0">
+                <div id="p2ElixirContainer" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1 flex items-center space-x-2 shadow-lg hidden">
+                    <div class="flex-1 bg-slate-800 h-2 rounded-full overflow-hidden p-0.5 border border-slate-700 relative">
+                        <div id="p2ElixirFill" class="bg-gradient-to-r from-rose-600 to-red-500 h-full rounded-full transition-all duration-75" style="width: 50%;"></div>
+                    </div>
+                    <div id="p2ElixirBadge" class="flex items-center space-x-1 text-rose-400 font-black text-[11px] w-10 justify-center bg-rose-950/60 py-0.5 rounded-lg border border-rose-800/50">
+                        <span id="p2ElixirText">5.0</span>
+                        <i class="fa-solid fa-bolt text-[9px] animate-pulse"></i>
+                    </div>
+                </div>
+
+                <div id="p2HandContainer" class="w-full hidden grid-cols-4 gap-1.5 shrink-0 transform rotate-180"></div>
+
+                <div class="w-full flex items-center justify-between bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-bold shadow">
+                    <div class="flex items-center space-x-1.5 text-rose-400">
+                        <i class="fa-solid fa-user-shield" id="topPlayerIcon"></i>
+                        <span id="topPlayerLabel">Rakip</span>
+                    </div>
+                    <div class="bg-slate-800 px-2.5 py-0.5 rounded-lg text-amber-400 font-mono tracking-wider flex items-center space-x-1 border border-slate-700 text-[11px]">
+                        <i class="fa-regular fa-clock"></i>
+                        <span id="matchTimer">03:00</span>
+                    </div>
+                    <div class="flex items-center space-x-2 text-xs">
+                        <span id="topCrownsCount" class="text-rose-400">🏆 0</span>
+                        <span id="bottomCrownsCount" class="text-blue-400">🏆 0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl bg-emerald-900 my-1 flex items-center justify-center flex-1 w-full max-w-xs" style="aspect-ratio: 9/16;">
+                <canvas id="gameCanvas" width="360" height="640" class="block w-full h-full cursor-pointer"></canvas>
+                <div id="deploymentWarning" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-rose-600/95 text-white text-[10px] font-bold px-3.5 py-1.5 rounded-full shadow-lg opacity-0 transition pointer-events-none z-20 whitespace-nowrap">
+                    Köprüye ve suya karakter koyulamaz!
+                </div>
+            </div>
+
+            <div class="w-full space-y-1.5 shrink-0">
+                <div class="flex items-center space-x-2">
+                    <div id="p1HandContainer" class="grid grid-cols-4 gap-1.5 flex-1"></div>
+                    <div class="flex flex-col items-center justify-center bg-slate-900 border border-slate-700 rounded-xl p-1 w-12 h-16 shrink-0 shadow">
+                        <span class="text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Sıradaki</span>
+                        <div id="p1NextCardDisplay" class="flex flex-col items-center justify-center flex-1"></div>
+                    </div>
+                </div>
+
+                <div class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1 flex items-center space-x-2 shadow-lg">
+                    <div id="p1ElixirBadge" class="flex items-center space-x-1 text-purple-400 font-black text-[11px] w-10 justify-center bg-purple-950/60 py-0.5 rounded-lg border border-purple-800/50">
+                        <i class="fa-solid fa-bolt text-[9px] animate-pulse"></i>
+                        <span id="p1ElixirText">5.0</span>
+                    </div>
+                    <div class="flex-1 bg-slate-800 h-2 rounded-full overflow-hidden p-0.5 border border-slate-700 relative">
+                        <div id="p1ElixirFill" class="bg-gradient-to-r from-purple-600 to-fuchsia-500 h-full rounded-full transition-all duration-75" style="width: 50%;"></div>
+                    </div>
+                    <div class="text-[10px] text-blue-400 font-bold truncate max-w-[90px]" id="p1NameDisplay">Savaşçı</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultScreen" class="w-full hidden flex flex-col items-center justify-center space-y-3 text-center z-20 h-full max-w-sm">
+            <div id="resultIcon" class="text-6xl animate-bounce">👑</div>
+            <div class="space-y-0.5">
+                <h2 id="resultTitle" class="text-xl font-black tracking-wider text-amber-400">ZAFER!</h2>
+                <p id="resultSubtitle" class="text-slate-300 text-[11px]">Rakip kuleleri yerle bir ettin ve altın kazandın.</p>
+            </div>
+
+            <div class="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-3 space-y-2 shadow-xl text-left">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
+                    <span class="text-slate-400 text-xs">Skor (Taclar)</span>
+                    <span id="resCrowns" class="font-bold text-amber-400 text-xs">3 - 0</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
+                    <span class="text-slate-400 text-xs">Kazanılan Altın</span>
+                    <span id="resGoldEarned" class="font-bold text-yellow-400 text-xs">+150 🪙</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400 text-xs">Süre</span>
+                    <span id="resTime" class="font-bold text-slate-200 text-xs">01:42</span>
+                </div>
+            </div>
+
+            <button onclick="returnToMenu()" class="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-600 active:from-amber-400 text-slate-950 font-black text-xs rounded-2xl shadow-xl transition flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-house"></i>
+                <span>ANA EKRANA DÖN</span>
+            </button>
+        </div>
+
+    </main>
+
+    <div id="rulesModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center z-50 p-3">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-4 space-y-3 shadow-2xl max-h-[85dvh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-circle-question text-amber-400"></i>
+                    <h3 class="font-black text-xs text-white">Crown Clash Kuralları</h3>
+                </div>
+                <button onclick="closeRulesModal()" class="text-slate-400 active:text-white p-1">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+            <div class="space-y-2 text-[10px] text-slate-300">
+                <div class="flex items-start space-x-2">
+                    <div class="bg-rose-500/20 p-2 rounded-lg text-rose-400 shrink-0 mt-0.5"><i class="fa-solid fa-ban"></i></div>
+                    <div><strong>Kesin Su Duvarı:</strong> Yerde yürüyen hiçbir karakter sudan geçemez, köprüleri kullanmak zorundadır.</div>
+                </div>
+                <div class="flex items-start space-x-2">
+                    <div class="bg-emerald-500/20 p-2 rounded-lg text-emerald-400 shrink-0 mt-0.5"><i class="fa-solid fa-globe"></i></div>
+                    <div><strong>Termux Lobi:</strong> Lobi sekmesinden aynı oda kodu ile otomatik doğrulama yaparak maç yapabilirsiniz.</div>
+                </div>
+            </div>
+            <button onclick="closeRulesModal()" class="w-full py-2 bg-amber-600 active:bg-amber-500 text-white font-bold text-xs rounded-xl transition">
+                Anladım
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const _k=['1bb4f921','fdb32498','8272cc24','cbb01040','5e3c67ba','63da4cf6','a195ce6e','fc1b07eb','c6d1dcd7','b4caa6f1','bd8efa5a','9d3feb47','59fa8a4f','4db7c0e1','d7cc8bb6','deaf12d5'];
+
+        const CARDS_DATABASE = [
+            { id: 'knight', name: 'Şövalye', cost: 3, type: 'troop', baseHp: 180, baseDamage: 22, range: 25, speed: 1.1, attackSpeed: 1.2, icon: '🛡️', short: 'ŞÖV', color: '#64748b', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'archer', name: 'Okçular', cost: 3, type: 'troop', baseHp: 55, baseDamage: 20, range: 100, speed: 1.1, attackSpeed: 1.2, icon: '🏹', short: 'OKÇ', color: '#ec4899', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'goblin', name: 'Goblinler', cost: 2, type: 'troop', baseHp: 45, baseDamage: 14, range: 25, speed: 1.8, attackSpeed: 1.0, icon: '🗡️', short: 'GOB', color: '#22c55e', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'skeletons', name: 'İskeletler', cost: 1, type: 'troop', baseHp: 25, baseDamage: 12, range: 25, speed: 1.6, attackSpeed: 1.0, icon: '💀', short: 'İSK', color: '#94a3b8', level: 1, unlockWins: 0, count: 3, isFlying: false },
+            { id: 'minions', name: 'Minyonlar', cost: 3, type: 'troop', baseHp: 50, baseDamage: 18, range: 90, speed: 1.4, attackSpeed: 1.1, icon: '🦇', short: 'MİN', color: '#3b82f6', level: 1, unlockWins: 0, isFlying: true },
+            { id: 'barbarian', name: 'Barbarlar', cost: 5, type: 'troop', baseHp: 120, baseDamage: 28, range: 28, speed: 1.0, attackSpeed: 1.4, icon: '🪓', short: 'BAR', color: '#f97316', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'royalgiant', name: 'Kraliyet Devi', cost: 6, type: 'troop', baseHp: 350, baseDamage: 32, range: 110, speed: 0.7, attackSpeed: 1.7, icon: '👑', short: 'KRD', color: '#ca8a04', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'giant', name: 'Dev', cost: 5, type: 'troop', baseHp: 300, baseDamage: 38, range: 30, speed: 0.7, attackSpeed: 1.8, icon: '🗿', short: 'DEV', color: '#eab308', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'musketeer', name: 'Silahşor', cost: 4, type: 'troop', baseHp: 65, baseDamage: 38, range: 120, speed: 1.0, attackSpeed: 1.3, icon: '🎯', short: 'SİL', color: '#f59e0b', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'minipekka', name: 'Mini P.E.K.K.A', cost: 4, type: 'troop', baseHp: 140, baseDamage: 60, range: 28, speed: 1.5, attackSpeed: 1.6, icon: '🤖', short: 'MPK', color: '#8b5cf6', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'hogrider', name: 'Domuz Binicisi', cost: 4, type: 'troop', baseHp: 190, baseDamage: 42, range: 28, speed: 1.9, attackSpeed: 1.5, icon: '🐗', short: 'DOM', color: '#d97706', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'valkyrie', name: 'Valkür', cost: 4, type: 'troop', baseHp: 210, baseDamage: 30, range: 30, speed: 1.1, attackSpeed: 1.5, icon: '🪓', short: 'VAL', color: '#dc2626', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'wizard', name: 'Büyücü', cost: 5, type: 'troop', baseHp: 75, baseDamage: 32, range: 110, speed: 1.0, attackSpeed: 1.5, icon: '🧙‍♂️', short: 'BÜY', color: '#3b82f6', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'elixircollector', name: 'İksir Toplayıcı', cost: 5, type: 'spell', baseDamage: 0, radius: 40, icon: '🧪', short: 'İKS', color: '#ec4899', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'barbarianhorde', name: 'Barbar Ordusu', cost: 7, type: 'troop', baseHp: 110, baseDamage: 26, range: 28, speed: 1.0, attackSpeed: 1.4, icon: '🪓', short: 'BRO', color: '#c2410c', level: 1, unlockWins: 0, count: 5, isFlying: false },
+            { id: 'archerhorde', name: 'Okçu Ordusu', cost: 7, type: 'troop', baseHp: 50, baseDamage: 20, range: 100, speed: 1.1, attackSpeed: 1.2, icon: '🏹', short: 'OKO', color: '#db2777', level: 1, unlockWins: 0, count: 5, isFlying: false },
+            { id: 'pekkafamily', name: 'P.E.K.K.A Ailesi', cost: 10, type: 'troop', baseHp: 320, baseDamage: 85, range: 28, speed: 1.2, attackSpeed: 1.8, icon: '🦾', short: 'PKA', color: '#7e22ce', level: 1, unlockWins: 0, count: 2, isFlying: false },
+            { id: 'witch', name: 'Cadı', cost: 5, type: 'troop', baseHp: 95, baseDamage: 24, range: 100, speed: 1.0, attackSpeed: 1.4, icon: '🔮', short: 'CAD', color: '#9333ea', level: 1, unlockWins: 30, isFlying: false },
+            { id: 'pekka', name: 'P.E.K.K.A', cost: 7, type: 'troop', baseHp: 400, baseDamage: 100, range: 30, speed: 0.8, attackSpeed: 2.0, icon: '🦾', short: 'PEK', color: '#a855f7', level: 1, unlockWins: 30, isFlying: false },
+            { id: 'babydragon', name: 'Bebek Ejderha', cost: 4, type: 'troop', baseHp: 160, baseDamage: 28, range: 95, speed: 1.4, attackSpeed: 1.3, icon: '🐉', short: 'EJD', color: '#16a34a', level: 1, unlockWins: 30, isFlying: true },
+            { id: 'skeletonarmy', name: 'İskelet Ordusu', cost: 3, type: 'troop', baseHp: 22, baseDamage: 12, range: 25, speed: 1.6, attackSpeed: 1.0, icon: '💀', short: 'İSO', color: '#cbd5e1', level: 1, unlockWins: 30, count: 10, isFlying: false },
+            { id: 'balloon', name: 'Balon', cost: 5, type: 'troop', baseHp: 240, baseDamage: 150, range: 28, speed: 1.2, attackSpeed: 2.5, icon: '🎈', short: 'BAL', color: '#ea580c', level: 1, unlockWins: 30, isFlying: true },
+            { id: 'giantskeleton', name: 'Dev İskelet', cost: 6, type: 'troop', baseHp: 320, baseDamage: 55, range: 28, speed: 0.8, attackSpeed: 1.8, icon: '💣', short: 'DİS', color: '#475569', level: 1, unlockWins: 30, isFlying: false },
+            { id: 'goblinbarrel', name: 'Goblin Fıçısı', cost: 3, type: 'spell', baseDamage: 20, radius: 45, icon: '🛢️', short: 'FIÇ', color: '#15803d', level: 1, unlockWins: 30, isFlying: false },
+            { id: 'princess', name: 'Prenses', cost: 3, type: 'troop', baseHp: 45, baseDamage: 28, range: 160, speed: 1.0, attackSpeed: 1.5, icon: '👸', short: 'PRE', color: '#f43f5e', level: 1, unlockWins: 50, isFlying: false },
+            { id: 'icewizard', name: 'Buz Büyücüsü', cost: 3, type: 'troop', baseHp: 75, baseDamage: 20, range: 110, speed: 1.0, attackSpeed: 1.5, icon: '❄️', short: 'BUZ', color: '#06b6d4', level: 1, unlockWins: 100, isFlying: false },
+            { id: 'miner', name: 'Madenci', cost: 3, type: 'troop', baseHp: 160, baseDamage: 32, range: 28, speed: 1.7, attackSpeed: 1.2, icon: '⛏️', short: 'MAD', color: '#78350f', level: 1, unlockWins: 150, isFlying: false },
+            { id: 'lavahound', name: 'Tazı', cost: 7, type: 'troop', baseHp: 420, baseDamage: 22, range: 30, speed: 0.6, attackSpeed: 2.0, icon: '🐕', short: 'TAZ', color: '#b45309', level: 1, unlockWins: 200, isFlying: true },
+            { id: 'sparky', name: 'Kıvılcım', cost: 6, type: 'troop', baseHp: 210, baseDamage: 260, range: 95, speed: 0.7, attackSpeed: 4.0, icon: '⚡', short: 'KIV', color: '#eab308', level: 1, unlockWins: 250, isFlying: false },
+            { id: 'nightwitch', name: 'Gece Cadısı', cost: 4, type: 'troop', baseHp: 110, baseDamage: 28, range: 30, speed: 1.0, attackSpeed: 1.3, icon: '🦇', short: 'GEC', color: '#581c87', level: 1, unlockWins: 300, isFlying: false },
+            { id: 'lumberjack', name: 'Oduncu', cost: 4, type: 'troop', baseHp: 150, baseDamage: 48, range: 28, speed: 1.9, attackSpeed: 1.0, icon: '🪓', short: 'ODU', color: '#14532d', level: 1, unlockWins: 350, isFlying: false },
+            { id: 'fireball', name: 'Alev Topu', cost: 4, type: 'spell', baseDamage: 100, radius: 55, icon: '🔥', short: 'ALV', color: '#ef4444', level: 1, unlockWins: 0, isFlying: false },
+            { id: 'arrowswarm', name: 'Ok Yığını', cost: 5, type: 'spell', baseDamage: 2, radius: 75, icon: '🎯', short: 'OKY', color: '#0ea5e9', level: 1, unlockWins: 0, count: 50, isFlying: false },
+            { id: 'fireswarm', name: 'Alev Yığını', cost: 7, type: 'spell', baseDamage: 90, radius: 65, icon: '💥', short: 'ALY', color: '#dc2626', level: 1, unlockWins: 0, count: 5, isFlying: false }
+        ];
+
+        const MAPS_DATABASE = [
+            { id: 'classic', name: 'Klasik Çayır', bg: '#1e3a1e', river: '#0284c7', bridge: '#78350f', icon: '🌳' },
+            { id: 'lava', name: 'Lav Arenası', bg: '#18181b', river: '#ea580c', bridge: '#52525b', icon: '🔥' },
+            { id: 'ice', name: 'Buz Vadisi', bg: '#0f172a', river: '#38bdf8', bridge: '#94a3b8', icon: '❄️' },
+            { id: 'goblin', name: 'Goblin Ormanı', bg: '#14532d', river: '#15803d', bridge: '#a16207', icon: '🌲' },
+            { id: 'royal', name: 'Kraliyet Sarayı', bg: '#3b0764', river: '#a855f7', bridge: '#eab308', icon: '👑' },
+            { id: 'graveyard', name: 'Mezarlık', bg: '#1e1b4b', river: '#4338ca', bridge: '#374151', icon: '💀' },
+            { id: 'desert', name: 'Çöl Fırtınası', bg: '#451a03', river: '#d97706', bridge: '#78350f', icon: '🏜️' },
+            { id: 'enchanted', name: 'Büyülü Orman', bg: '#064e3b', river: '#10b981', bridge: '#047857', icon: '🍄' },
+            { id: 'citadel', name: 'Karanlık Kale', bg: '#09090b', river: '#7f1d1d', bridge: '#27272a', icon: '🏰' },
+            { id: 'space', name: 'Yıldız Uzayı', bg: '#020617', river: '#6366f1', bridge: '#475569', icon: '🌌' },
+            { id: 'volcano', name: 'Aktif Yanardağ', bg: '#270e0a', river: '#dc2626', bridge: '#451a03', icon: '🌋' },
+            { id: 'cyberpunk', name: 'Neon Şehir', bg: '#030712', river: '#ec4899', bridge: '#1e293b', icon: '🌆' },
+            { id: 'autumn', name: 'Sonbahar', bg: '#2d1b0d', river: '#d97706', bridge: '#451a03', icon: '🍁' },
+            { id: 'crystal', name: 'Kristal Mağara', bg: '#0f172a', river: '#818cf8', bridge: '#312e81', icon: '💎' },
+            { id: 'swamp', name: 'Bataklık Diyarı', bg: '#14281d', river: '#4d7c0f', bridge: '#365314', icon: '🐊' },
+            { id: 'heaven', name: 'Göksel Tapınak', bg: '#1e1b4b', river: '#fde047', bridge: '#713f12', icon: '🏛️' },
+            { id: 'toxic', name: 'Zehirli Fabrika', bg: '#062c1b', river: '#22c55e', bridge: '#1c1917', icon: '☣️' },
+            { id: 'pirate', name: 'Korsan Koyu', bg: '#082f49', river: '#0284c7', bridge: '#78350f', icon: '🏴‍☠️' },
+            { id: 'shadow', name: 'Gölgeler Diyarı', bg: '#090514', river: '#9333ea', bridge: '#2e1065', icon: '👥' },
+            { id: 'candy', name: 'Şeker Diyarı', bg: '#500724', river: '#f43f5e', bridge: '#be185d', icon: '🍬' }
+        ];
+
+        let playerGold = 500;
+        let winStreak = 0;
+        let totalWins = 0;
+        let gameMode = 'pve';
+        let selectedDifficulty = 'orta';
+        let selectedMap = 'classic';
+        let towerLevel = 1;
+
+        let decks = Array.from({ length: 10 }, (_, i) => ({
+            name: `Deste ${i + 1}`,
+            cards: ['knight', 'archer', 'goblin', 'skeletons', 'minions', 'giant', 'musketeer', 'fireball']
+        }));
+        let activeDeckIndex = 0;
+
+        let p1FullDeck = [], p2FullDeck = [], p1Hand = [], p1NextCard = '', p2Hand = [], p2NextCard = '';
+        let gameState = 'menu';
+        let p1Name = "Savaşçı", p2Name = "Rakip";
+
+        let p1Elixir = 5.0, p2Elixir = 5.0;
+        let maxElixir = 10.0, elixirRegenRate = 0.35;
+        let matchTimerSeconds = 180, timerInterval = null, gameLoopReq = null, lastFrameTime = 0;
+        let p1Crowns = 0, p2Crowns = 0;
+        let p1SelectedCardIndex = null, p2SelectedCardIndex = null;
+
+        let towers = [], units = [], projectiles = [], particles = [], floatingTexts = [];
+
+        let lobbySSE = null;
+        let myClientId = 'oyuncu_' + Math.random().toString(36).substring(2, 6).toUpperCase();
+        let activeRoomId = '';
+        let isLobbyHost = false;
+        let sessionToken = '';
+
+        let canvas = document.getElementById('gameCanvas');
+        let ctx = canvas.getContext('2d');
+
+        window.onload = () => {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            renderMapSelector();
+            renderDeckSelector();
+            renderActiveDeck();
+            renderCollection();
+            renderUpgradesList();
+            updateGoldUI();
+            updateUnlockProgressUI();
+            setupCanvasEvents();
+        };
+
+        function updateGoldUI() { document.getElementById('goldDisplay').innerText = playerGold; }
+
+        function updateUnlockProgressUI() {
+            document.getElementById('totalWinsDisplay').innerText = totalWins;
+            let info = getNextUnlockInfo();
+            document.getElementById('nextUnlockDisplay').innerText = info.winsNeeded > 0 ? `Kilit: ${info.name} (${info.winsNeeded} maç kaldı)` : info.name;
+            let progressPct = Math.min(100, (totalWins / 350) * 100);
+            document.getElementById('unlockProgressBar').style.width = `${progressPct}%`;
+        }
+
+        function getNextUnlockInfo() {
+            if (totalWins < 30) return { name: "7 Özel Kart", winsNeeded: 30 - totalWins };
+            if (totalWins < 50) return { name: "Prenses", winsNeeded: 50 - totalWins };
+            if (totalWins < 100) return { name: "Buz Büyücüsü", winsNeeded: 100 - totalWins };
+            if (totalWins < 150) return { name: "Madenci", winsNeeded: 150 - totalWins };
+            if (totalWins < 200) return { name: "Tazı", winsNeeded: 200 - totalWins };
+            if (totalWins < 250) return { name: "Kıvılcım", winsNeeded: 250 - totalWins };
+            if (totalWins < 300) return { name: "Gece Cadısı", winsNeeded: 300 - totalWins };
+            if (totalWins < 350) return { name: "Oduncu", winsNeeded: 350 - totalWins };
+            return { name: "Tüm Kartlar Açıldı!", winsNeeded: 0 };
+        }
+
+        function switchTab(tabId) {
+            ['battle', 'lobby', 'decks', 'workshop', 'saves'].forEach(t => {
+                document.getElementById(`tab-content-${t}`).classList.add('hidden');
+                document.getElementById(`tab-btn-${t}`).className = "menu-tab py-2 rounded-xl text-[9px] font-bold text-slate-400 hover:text-white transition flex flex-col items-center";
+            });
+            document.getElementById(`tab-content-${tabId}`).classList.remove('hidden');
+            document.getElementById(`tab-btn-${tabId}`).className = "menu-tab py-2 rounded-xl text-[9px] font-bold bg-amber-600 text-white transition shadow flex flex-col items-center";
+            if (tabId === 'decks') { renderActiveDeck(); renderCollection(); }
+            if (tabId === 'workshop') { renderUpgradesList(); }
+        }
+
+        async function ensureVerifiedToken() {
+            if (sessionToken) return sessionToken;
+            const res = await fetch('/verify', {
+                method: 'POST',
+                body: _k.join('')
+            });
+            if (!res.ok) throw new Error('Doğrulama başarısız: ' + res.status);
+            sessionToken = (await res.text()).trim();
+            return sessionToken;
+        }
+
+        async function joinLobbyRoom() {
+            let roomVal = document.getElementById('lobbyRoomInput').value.trim().toUpperCase();
+            if (!roomVal) { showDeploymentWarning("Oda kodu girin!"); return; }
+            activeRoomId = roomVal;
+            p1Name = document.getElementById('usernameInput').value.trim() || "Savaşçı";
+            if (lobbySSE) lobbySSE.close();
+
+            document.getElementById('lobbyConnStatus').innerText = "Doğrulanıyor...";
+            document.getElementById('lobbyConnStatus').className = "text-amber-400";
+
+            try {
+                const tk = await ensureVerifiedToken();
+                lobbySSE = new EventSource(`/events?r=${encodeURIComponent(activeRoomId)}&id=${encodeURIComponent(myClientId)}&s=${encodeURIComponent(tk)}`);
+                lobbySSE.onmessage = (event) => {
+                    let msg = JSON.parse(event.data);
+                    if (msg.t === 'hello') {
+                        isLobbyHost = (msg.host === myClientId);
+                        document.getElementById('lobbyConnStatus').innerText = `Bağlı (${activeRoomId})`;
+                        document.getElementById('lobbyConnStatus').className = "text-emerald-400";
+                        document.getElementById('lobbyRoleBadge').innerText = isLobbyHost ? "HOST (KURUCU)" : "OYUNCU 2";
+                        document.getElementById('hostStartOnlineBtn').classList.toggle('hidden', !isLobbyHost);
+                        document.getElementById('guestWaitMsg').classList.toggle('hidden', isLobbyHost);
+                        updateLobbyPlayersUI([p1Name]);
+                        sendLobbyMsg({ to: '*', t: 'join', name: p1Name });
+                    } else if (msg.t === 'join') {
+                        if (isLobbyHost) {
+                            sendLobbyMsg({ to: '*', t: 'roomSync', players: [p1Name, msg.name] });
+                            updateLobbyPlayersUI([p1Name, msg.name]);
+                        }
+                    } else if (msg.t === 'roomSync') {
+                        updateLobbyPlayersUI(msg.players);
+                    } else if (msg.t === 'left' || msg.t === 'hostleft') {
+                        document.getElementById('lobbyConnStatus').innerText = "Bağlantı Kesildi";
+                        document.getElementById('lobbyConnStatus').className = "text-rose-400";
+                    } else if (msg.t === 'startMatch') {
+                        selectedMap = msg.map || 'classic';
+                        p2Name = msg.hostName || "Rakip";
+                        startGame('online');
+                    } else if (msg.t === 'deploy') {
+                        if (gameState === 'battle') {
+                            let mirrorX = canvas.width - msg.x;
+                            let mirrorY = canvas.height - msg.y;
+                            if (msg.isSpell) {
+                                let c = CARDS_DATABASE.find(x => x.id === msg.cardId);
+                                if (c) castSpell(mirrorX, mirrorY, 'top', c);
+                            } else {
+                                spawnUnit(msg.cardId, mirrorX, mirrorY, 'top');
+                            }
+                        }
+                    }
+                };
+                lobbySSE.onerror = () => {
+                    document.getElementById('lobbyConnStatus').innerText = "Sunucu Hatası";
+                    document.getElementById('lobbyConnStatus').className = "text-rose-400";
+                };
+            } catch (err) {
+                document.getElementById('lobbyConnStatus').innerText = "Doğrulama Hatası";
+                document.getElementById('lobbyConnStatus').className = "text-rose-400";
+                showDeploymentWarning("Sunucu doğrulaması geçilemedi!");
+            }
+        }
+
+        function sendLobbyMsg(payload) {
+            if (!activeRoomId || !sessionToken) return;
+            fetch(`/send?r=${encodeURIComponent(activeRoomId)}&id=${encodeURIComponent(myClientId)}&s=${encodeURIComponent(sessionToken)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(() => {});
+        }
+
+        function updateLobbyPlayersUI(list) {
+            let box = document.getElementById('lobbyPlayersBox');
+            if (!box) return;
+            box.innerHTML = list.map(p => `<span class="bg-slate-700 border border-amber-500/40 text-amber-300 font-bold text-[10px] px-2.5 py-1 rounded-lg">${p}</span>`).join('');
+        }
+
+        function leaveLobbyRoom() {
+            if (lobbySSE) { lobbySSE.close(); lobbySSE = null; }
+            activeRoomId = '';
+            isLobbyHost = false;
+            document.getElementById('lobbyConnStatus').innerText = "Bağlı Değil";
+            document.getElementById('lobbyConnStatus').className = "text-rose-400";
+            document.getElementById('lobbyRoleBadge').innerText = "-";
+            document.getElementById('hostStartOnlineBtn').classList.add('hidden');
+            document.getElementById('guestWaitMsg').classList.add('hidden');
+            document.getElementById('lobbyPlayersBox').innerText = "Oda seçilmedi.";
+        }
+
+        function hostStartOnlineMatch() {
+            if (!isLobbyHost || !activeRoomId) return;
+            p1Name = document.getElementById('usernameInput').value.trim() || "Host";
+            sendLobbyMsg({ to: '*', t: 'startMatch', map: selectedMap, hostName: p1Name });
+            p2Name = "Rakip Oyuncu";
+            startGame('online');
+        }
+
+        function renderMapSelector() {
+            let container = document.getElementById('mapGridContainer');
+            if (!container) return;
+            container.innerHTML = MAPS_DATABASE.map(m => {
+                let isSelected = selectedMap === m.id;
+                return `
+                    <button onclick="selectMap('${m.id}')" class="p-2 rounded-xl border flex flex-col items-center justify-center space-y-1 transition active:scale-95 ${isSelected ? 'bg-amber-600/30 border-amber-500 shadow-md' : 'bg-slate-800 border-slate-700 text-slate-300'}">
+                        <span class="text-base">${m.icon}</span>
+                        <span class="text-[8px] font-bold truncate w-full text-center">${m.name}</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function selectMap(mapId) {
+            selectedMap = mapId;
+            let mObj = MAPS_DATABASE.find(m => m.id === mapId);
+            if (mObj) document.getElementById('selectedMapLabel').innerText = mObj.name;
+            renderMapSelector();
+        }
+
+        function renderDeckSelector() {
+            let container = document.getElementById('deckSelectorContainer');
+            if (!container) return;
+            container.innerHTML = decks.map((d, i) => `
+                <button onclick="setActiveDeck(${i})" class="px-3 py-1.5 rounded-xl font-bold text-[10px] whitespace-nowrap transition ${activeDeckIndex === i ? 'bg-amber-600 text-white shadow' : 'bg-slate-800 text-slate-300 border border-slate-700'}">
+                    ${d.name}
+                </button>
+            `).join('');
+        }
+
+        function setActiveDeck(idx) {
+            activeDeckIndex = idx;
+            renderDeckSelector();
+            renderActiveDeck();
+            renderCollection();
+        }
+
+        function renderActiveDeck() {
+            let deck = decks[activeDeckIndex];
+            document.getElementById('activeDeckName').innerText = deck.name;
+            document.getElementById('deckCardCount').innerText = deck.cards.length;
+
+            let totalCost = deck.cards.reduce((sum, id) => sum + ((CARDS_DATABASE.find(c => c.id === id) || {}).cost || 0), 0);
+            document.getElementById('avgElixirDisplay').innerText = deck.cards.length > 0 ? (totalCost / deck.cards.length).toFixed(1) : 0;
+
+            let container = document.getElementById('activeDeckSlots');
+            let html = '';
+            for (let i = 0; i < 8; i++) {
+                let cardId = deck.cards[i];
+                if (cardId) {
+                    let c = CARDS_DATABASE.find(item => item.id === cardId);
+                    html += `
+                        <div onclick="removeCardFromDeck(${i})" class="relative bg-slate-800 border border-slate-700 rounded-xl p-1.5 flex flex-col items-center justify-between h-20 cursor-pointer hover:border-rose-500 transition group">
+                            <span class="absolute top-1 left-1 text-[8px] font-black text-purple-300">⚡${c.cost}</span>
+                            <span class="text-xl mt-2">${c.icon}</span>
+                            <span class="text-[8px] font-bold text-slate-200 truncate w-full text-center">${c.name}</span>
+                            <div class="absolute inset-0 bg-rose-600/80 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                                <i class="fa-solid fa-trash text-white text-xs"></i>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `<div class="bg-slate-900 border border-dashed border-slate-700 rounded-xl flex items-center justify-center h-20 text-slate-600 text-xs font-bold">Boş</div>`;
+                }
+            }
+            container.innerHTML = html;
+        }
+
+        function removeCardFromDeck(index) {
+            decks[activeDeckIndex].cards.splice(index, 1);
+            renderActiveDeck();
+            renderCollection();
+        }
+
+        function renderCollection() {
+            let deck = decks[activeDeckIndex];
+            let unlocked = CARDS_DATABASE.filter(c => totalWins >= c.unlockWins || c.unlockWins === 0);
+            let container = document.getElementById('collectionCardsGrid');
+            if (!container) return;
+            container.innerHTML = unlocked.map(c => {
+                let inDeck = deck.cards.includes(c.id);
+                return `
+                    <div onclick="addCardToDeck('${c.id}')" class="relative bg-slate-800 border ${inDeck ? 'border-amber-500/80 bg-amber-950/20' : 'border-slate-700'} rounded-xl p-1.5 flex flex-col items-center justify-between h-20 cursor-pointer hover:border-amber-400 transition">
+                        <span class="absolute top-1 left-1 text-[8px] font-black text-purple-300">⚡${c.cost}</span>
+                        <span class="text-xl mt-2">${c.icon}</span>
+                        <span class="text-[8px] font-bold text-slate-200 truncate w-full text-center">${c.name}</span>
+                        ${inDeck ? '<span class="absolute bottom-1 right-1 text-[8px] text-amber-400 font-bold">✓</span>' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addCardToDeck(cardId) {
+            let deck = decks[activeDeckIndex];
+            if (deck.cards.length >= 8) { showDeploymentWarning("Destede en fazla 8 kart olabilir!"); return; }
+            if (deck.cards.includes(cardId)) { showDeploymentWarning("Bu kart zaten destede var!"); return; }
+            deck.cards.push(cardId);
+            renderActiveDeck();
+            renderCollection();
+        }
+
+        function renderUpgradesList() {
+            let container = document.getElementById('upgradesListContainer');
+            if (!container) return;
+            let towerCost = towerLevel * 150;
+            let towerHp = 600 + (towerLevel - 1) * 120;
+            let towerDmg = 30 + (towerLevel - 1) * 8;
+
+            let html = `
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex items-center justify-between shadow-xl">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-amber-500/20 border border-amber-500 text-amber-400 shadow">🏰</div>
+                        <div>
+                            <h4 class="font-bold text-xs text-white">Kuleler (Sv.${towerLevel})</h4>
+                            <p class="text-[10px] text-slate-400">Can: ${towerHp} | Hasar: ${towerDmg}</p>
+                        </div>
+                    </div>
+                    <button onclick="upgradeTower()" class="px-3 py-1.5 bg-amber-600 active:bg-amber-500 text-white font-bold text-xs rounded-xl shadow-lg">${towerCost} 🪙</button>
+                </div>
+            `;
+
+            CARDS_DATABASE.forEach(c => {
+                let cost = c.level * 90;
+                let curDmg = Math.round(c.baseDamage * (1 + (c.level - 1) * 0.15));
+                html += `
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex items-center justify-between shadow-xl">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-inner shrink-0" style="background-color: ${c.color}33; border: 1px solid ${c.color};">${c.icon}</div>
+                            <div class="min-w-0">
+                                <h4 class="font-bold text-xs text-white truncate">${c.name} <span class="text-purple-400">Sv.${c.level}</span></h4>
+                                <p class="text-[10px] text-slate-400">Hasar: ${curDmg} | İksir: ${c.cost}</p>
+                            </div>
+                        </div>
+                        <button onclick="upgradeCard('${c.id}')" class="px-3 py-1.5 bg-purple-600 active:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-lg">${cost} 🪙</button>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function upgradeTower() {
+            let cost = towerLevel * 150;
+            if (playerGold < cost) { showDeploymentWarning("Yetersiz Altın!"); return; }
+            playerGold -= cost; towerLevel++; updateGoldUI(); renderUpgradesList();
+        }
+
+        function upgradeCard(cardId) {
+            let card = CARDS_DATABASE.find(c => c.id === cardId);
+            let cost = card.level * 90;
+            if (playerGold < cost) { showDeploymentWarning("Yetersiz Altın!"); return; }
+            playerGold -= cost; card.level++; updateGoldUI(); renderUpgradesList();
+        }
+
+        function generateRandomHash() {
+            let letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            let numbers = '0123456789';
+            let lRes = '', nRes = '';
+            for (let i = 0; i < 4; i++) {
+                lRes += letters.charAt(Math.floor(Math.random() * letters.length));
+                nRes += numbers.charAt(Math.floor(Math.random() * numbers.length));
+            }
+            return (lRes + nRes).split('').sort(() => 0.5 - Math.random()).join('');
+        }
+
+        function getSaveDataObject() {
+            p1Name = document.getElementById('usernameInput').value.trim() || "Savaşçı";
+            return {
+                version: 3.3,
+                p1Name, playerGold, towerLevel, winStreak, totalWins, decks,
+                cards: CARDS_DATABASE.map(c => ({ id: c.id, level: c.level }))
+            };
+        }
+
+        function saveGameFileNew() { executeFileSave(); }
+        function saveGameFileOverwrite() { executeFileSave(); showDeploymentWarning("Kayıt güncellendi ve üstüne yazıldı!"); }
+
+        function executeFileSave() {
+            p1Name = document.getElementById('usernameInput').value.trim() || "Savaşçı";
+            let filename = `${p1Name.replace(/[^a-zA-Z0-9]/g, '')}${generateRandomHash()}.crown`;
+            let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(getSaveDataObject()));
+            let a = document.createElement('a');
+            a.href = dataStr; a.download = filename;
+            document.body.appendChild(a); a.click(); a.remove();
+            showDeploymentWarning(`Dosya kaydedildi: ${filename}`);
+        }
+
+        function loadGameFile(event) {
+            let file = event.target.files[0];
+            if (!file) return;
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let data = JSON.parse(e.target.result);
+                    if (data.p1Name) { p1Name = data.p1Name; document.getElementById('usernameInput').value = p1Name; }
+                    if (typeof data.playerGold === 'number') playerGold = data.playerGold;
+                    if (typeof data.towerLevel === 'number') towerLevel = data.towerLevel;
+                    if (typeof data.totalWins === 'number') totalWins = data.totalWins;
+                    if (data.decks) decks = data.decks;
+                    if (data.cards) {
+                        data.cards.forEach(sc => {
+                            let c = CARDS_DATABASE.find(item => item.id === sc.id);
+                            if (c) c.level = sc.level;
+                        });
+                    }
+                    updateGoldUI(); updateUnlockProgressUI(); renderDeckSelector(); renderActiveDeck(); renderUpgradesList();
+                    showDeploymentWarning(".crown kayıt başarıyla yüklendi!");
+                } catch (err) { showDeploymentWarning("Geçersiz .crown dosyası!"); }
+            };
+            reader.readAsText(file);
+        }
+
+        function setGameMode(mode) {
+            gameMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.className = "mode-btn py-2 px-2 rounded-xl font-bold text-xs bg-slate-800 text-slate-300 border border-slate-700 active:scale-95 transition flex items-center justify-center space-x-1.5";
+            });
+            let b = document.getElementById(`btn-mode-${mode}`);
+            if (b) b.className = "mode-btn py-2 px-2 rounded-xl font-bold text-xs bg-amber-600 text-white border border-amber-500 shadow-lg active:scale-95 transition flex items-center justify-center space-x-1.5";
+            document.getElementById('aiDifficultyContainer').classList.toggle('hidden', mode === 'pvp');
+        }
+
+        function setDifficulty(diff) {
+            selectedDifficulty = diff;
+            document.querySelectorAll('.diff-btn').forEach(btn => {
+                btn.className = "diff-btn py-1.5 px-1 rounded-xl font-bold text-xs bg-slate-800 text-slate-300 border border-slate-700 active:scale-95 transition flex flex-col items-center";
+            });
+            let b = document.getElementById(`btn-diff-${diff}`);
+            if (b) b.className = "diff-btn py-1.5 px-1 rounded-xl font-bold text-xs bg-amber-600 text-white border border-amber-500 active:scale-95 transition flex flex-col items-center shadow-lg";
+        }
+
+        function openRulesModal() { document.getElementById('rulesModal').classList.replace('hidden', 'flex'); }
+        function closeRulesModal() { document.getElementById('rulesModal').classList.replace('flex', 'hidden'); }
+
+        function shuffleDeck(deck) {
+            for (let i = deck.length - 1; i > 0; i--) {
+                let j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+        }
+
+        function getUniqueHand(fullDeck, existingHand = []) {
+            let hand = [];
+            let pool = [...fullDeck];
+            shuffleDeck(pool);
+            for (let id of pool) {
+                if (hand.length < 4 && !hand.includes(id) && !existingHand.includes(id)) {
+                    hand.push(id);
+                }
+            }
+            for (let id of pool) {
+                if (hand.length < 4 && !hand.includes(id)) {
+                    hand.push(id);
+                }
+            }
+            return hand;
+        }
+
+        function startGame(overrideMode) {
+            if (overrideMode === 'online') {
+                gameMode = 'online';
+            } else if (gameMode === 'online') {
+                gameMode = 'pve';
+            }
+
+            p1Name = document.getElementById('usernameInput').value.trim() || "Savaşçı";
+            if (gameMode === 'pvp') p2Name = "2. Oyuncu";
+            else if (gameMode === 'pve') p2Name = `${selectedDifficulty.toUpperCase()} AI`;
+
+            let currentDeck = decks[activeDeckIndex].cards;
+            if (!currentDeck || currentDeck.length < 8) { 
+                showDeploymentWarning("Destede tam 8 kart olmalıdır!"); 
+                return; 
+            }
+
+            let menuScreen = document.getElementById('mainMenuScreen');
+            let battleScreen = document.getElementById('battleScreen');
+            if (menuScreen) menuScreen.classList.add('hidden');
+            if (battleScreen) battleScreen.classList.remove('hidden');
+            gameState = 'battle';
+
+            canvas.width = 360;
+            canvas.height = 640;
+
+            p1Elixir = 5.0;
+            p2Elixir = 5.0;
+            matchTimerSeconds = 180;
+            p1Crowns = 0;
+            p2Crowns = 0;
+            p1SelectedCardIndex = null;
+            p2SelectedCardIndex = null;
+
+            document.getElementById('matchTimer').innerText = "03:00";
+            document.getElementById('topCrownsCount').innerText = "🏆 0";
+            document.getElementById('bottomCrownsCount').innerText = "🏆 0";
+            document.getElementById('p1NameDisplay').innerText = p1Name;
+            document.getElementById('topPlayerLabel').innerText = p2Name;
+            document.getElementById('topPlayerIcon').className = gameMode === 'pve' ? "fa-solid fa-robot text-rose-400" : "fa-solid fa-user-shield text-rose-400";
+            
+            let p2HandEl = document.getElementById('p2HandContainer');
+            let p2ElixirEl = document.getElementById('p2ElixirContainer');
+            if (gameMode === 'pvp') {
+                p2HandEl.classList.remove('hidden');
+                p2HandEl.classList.add('grid');
+                p2ElixirEl.classList.remove('hidden');
+                p2ElixirEl.classList.add('flex');
+            } else {
+                p2HandEl.classList.remove('grid');
+                p2HandEl.classList.add('hidden');
+                p2ElixirEl.classList.remove('flex');
+                p2ElixirEl.classList.add('hidden');
+            }
+
+            p1FullDeck = [...currentDeck];
+            p2FullDeck = [...currentDeck];
+
+            p1Hand = getUniqueHand(p1FullDeck);
+            let remP1 = p1FullDeck.filter(id => !p1Hand.includes(id));
+            p1NextCard = remP1[0] || p1FullDeck[0];
+
+            p2Hand = getUniqueHand(p2FullDeck);
+            let remP2 = p2FullDeck.filter(id => !p2Hand.includes(id));
+            p2NextCard = remP2[0] || p2FullDeck[0];
+
+            renderPlayerHands();
+            initArenaTowers();
+
+            units = [];
+            projectiles = [];
+            particles = [];
+            floatingTexts = [];
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 1000);
+
+            render();
+            lastFrameTime = performance.now();
+            if (gameLoopReq) cancelAnimationFrame(gameLoopReq);
+            gameLoopReq = requestAnimationFrame(gameLoop);
+        }
+
+        function returnToMenu() {
+            if (timerInterval) clearInterval(timerInterval);
+            if (gameLoopReq) cancelAnimationFrame(gameLoopReq);
+            document.getElementById('resultScreen').classList.add('hidden');
+            document.getElementById('battleScreen').classList.add('hidden');
+            document.getElementById('mainMenuScreen').classList.remove('hidden');
+            gameState = 'menu';
+            updateGoldUI();
+            updateUnlockProgressUI();
+        }
+
+        function updateTimer() {
+            if (gameState !== 'battle') return;
+            matchTimerSeconds--;
+            let mins = Math.floor(matchTimerSeconds / 60);
+            let secs = matchTimerSeconds % 60;
+            document.getElementById('matchTimer').innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            if (matchTimerSeconds <= 0) endGameByTimeout();
+        }
+
+        function initArenaTowers() {
+            let w = canvas.width;
+            let h = canvas.height;
+            let hp = 600 + (towerLevel - 1) * 120;
+            let dmg = 30 + (towerLevel - 1) * 8;
+
+            towers = [
+                { id: 'top_king', side: 'top', type: 'king', x: w / 2, y: 60, hp: hp, maxHp: hp, radius: 24, range: 100, damage: dmg, attackSpeed: 1.2, attackCooldown: 0 },
+                { id: 'top_left', side: 'top', type: 'princess', x: w * 0.22, y: h * 0.22, hp: Math.round(hp * 0.45), maxHp: Math.round(hp * 0.45), radius: 18, range: 90, damage: Math.round(dmg * 0.7), attackSpeed: 1.0, attackCooldown: 0 },
+                { id: 'top_right', side: 'top', type: 'princess', x: w * 0.78, y: h * 0.22, hp: Math.round(hp * 0.45), maxHp: Math.round(hp * 0.45), radius: 18, range: 90, damage: Math.round(dmg * 0.7), attackSpeed: 1.0, attackCooldown: 0 },
+                { id: 'bottom_king', side: 'bottom', type: 'king', x: w / 2, y: h - 60, hp: hp, maxHp: hp, radius: 24, range: 100, damage: dmg, attackSpeed: 1.2, attackCooldown: 0 },
+                { id: 'bottom_left', side: 'bottom', type: 'princess', x: w * 0.22, y: h - (h * 0.22), hp: Math.round(hp * 0.45), maxHp: Math.round(hp * 0.45), radius: 18, range: 90, damage: Math.round(dmg * 0.7), attackSpeed: 1.0, attackCooldown: 0 },
+                { id: 'bottom_right', side: 'bottom', type: 'princess', x: w * 0.78, y: h - (h * 0.22), hp: Math.round(hp * 0.45), maxHp: Math.round(hp * 0.45), radius: 18, range: 90, damage: Math.round(dmg * 0.7), attackSpeed: 1.0, attackCooldown: 0 }
+            ];
+        }
+
+        function renderPlayerHands() {
+            let p1Container = document.getElementById('p1HandContainer');
+            if (p1Container) {
+                p1Container.innerHTML = p1Hand.map((cardId, idx) => {
+                    let card = CARDS_DATABASE.find(c => c.id === cardId);
+                    let isSelected = p1SelectedCardIndex === idx;
+                    let canAfford = p1Elixir >= card.cost;
+                    return `
+                        <div onclick="selectCard('bottom', ${idx})" class="relative bg-slate-900 border-2 ${isSelected ? 'border-amber-400 scale-105 shadow-lg bg-slate-800' : 'border-slate-700'} ${canAfford ? 'opacity-100' : 'opacity-60'} rounded-xl p-1 flex flex-col items-center justify-between cursor-pointer transition transform active:scale-95 h-18">
+                            <div class="absolute top-0.5 left-0.5 bg-purple-950/90 text-purple-300 font-black text-[8px] px-1 rounded border border-purple-800">⚡${card.cost}</div>
+                            <span class="text-xl mt-2">${card.icon}</span>
+                            <span class="text-[8px] font-bold text-slate-200 truncate w-full text-center">${card.name}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            let nextCardP1 = CARDS_DATABASE.find(c => c.id === p1NextCard);
+            let p1NextEl = document.getElementById('p1NextCardDisplay');
+            if (p1NextEl && nextCardP1) {
+                p1NextEl.innerHTML = `
+                    <span class="text-base">${nextCardP1.icon}</span>
+                    <span class="text-[7px] text-purple-300 font-bold">⚡${nextCardP1.cost}</span>
+                `;
+            }
+
+            if (gameMode === 'pvp') {
+                let p2Container = document.getElementById('p2HandContainer');
+                if (p2Container) {
+                    p2Container.innerHTML = p2Hand.map((cardId, idx) => {
+                        let card = CARDS_DATABASE.find(c => c.id === cardId);
+                        let isSelected = p2SelectedCardIndex === idx;
+                        let canAfford = p2Elixir >= card.cost;
+                        return `
+                            <div onclick="selectCard('top', ${idx})" class="relative bg-slate-900 border-2 ${isSelected ? 'border-amber-400 scale-105 shadow-lg bg-slate-800' : 'border-slate-700'} ${canAfford ? 'opacity-100' : 'opacity-60'} rounded-xl p-1 flex flex-col items-center justify-between cursor-pointer transition transform active:scale-95 h-18">
+                                <div class="absolute top-0.5 left-0.5 bg-rose-950/90 text-rose-300 font-black text-[8px] px-1 rounded border border-rose-800">⚡${card.cost}</div>
+                                <span class="text-xl mt-2">${card.icon}</span>
+                                <span class="text-[8px] font-bold text-slate-200 truncate w-full text-center">${card.name}</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+        }
+
+        function selectCard(side, idx) {
+            if (side === 'bottom') {
+                let card = CARDS_DATABASE.find(c => c.id === p1Hand[idx]);
+                if (p1Elixir < card.cost) { showDeploymentWarning("Yetersiz Eliksir!"); return; }
+                p1SelectedCardIndex = p1SelectedCardIndex === idx ? null : idx;
+            } else {
+                let card = CARDS_DATABASE.find(c => c.id === p2Hand[idx]);
+                if (p2Elixir < card.cost) { showDeploymentWarning("Yetersiz Eliksir!"); return; }
+                p2SelectedCardIndex = p2SelectedCardIndex === idx ? null : idx;
+            }
+            renderPlayerHands();
+        }
+
+        function showDeploymentWarning(text) {
+            let el = document.getElementById('deploymentWarning');
+            if (!el) return;
+            el.innerText = text;
+            el.style.opacity = '1';
+            setTimeout(() => { el.style.opacity = '0'; }, 1600);
+        }
+
+        function setupCanvasEvents() {
+            const handleDeploy = (clientX, clientY) => {
+                if (gameState !== 'battle') return;
+
+                let rect = canvas.getBoundingClientRect();
+                let scaleX = canvas.width / rect.width;
+                let scaleY = canvas.height / rect.height;
+                let clickX = (clientX - rect.left) * scaleX;
+                let clickY = (clientY - rect.top) * scaleY;
+
+                let riverTop = canvas.height * 0.44;
+                let riverBottom = canvas.height * 0.56;
+                let bridge1XMin = canvas.width * 0.16, bridge1XMax = canvas.width * 0.34;
+                let bridge2XMin = canvas.width * 0.66, bridge2XMax = canvas.width * 0.84;
+
+                if (p1SelectedCardIndex !== null) {
+                    let cardId = p1Hand[p1SelectedCardIndex];
+                    let card = CARDS_DATABASE.find(c => c.id === cardId);
+                    if (p1Elixir < card.cost) { showDeploymentWarning("Yetersiz Eliksir!"); return; }
+
+                    let isSpell = card.type === 'spell';
+                    if (!isSpell) {
+                        let isRiverOrBridge = (clickY >= riverTop && clickY <= riverBottom) || 
+                                              ((clickY >= riverTop - 25 && clickY <= riverBottom + 25) && ((clickX >= bridge1XMin && clickX <= bridge1XMax) || (clickX >= bridge2XMin && clickX <= bridge2XMax)));
+                        if (isRiverOrBridge) {
+                            showDeploymentWarning("Köprüye ve suya karakter koyulamaz!");
+                            return;
+                        }
+                        if (clickY < riverBottom) {
+                            showDeploymentWarning("Sadece kendi sahana bırakabilirsin!");
+                            return;
+                        }
+                    }
+
+                    p1Elixir -= card.cost;
+                    let usedIdx = p1SelectedCardIndex;
+                    p1SelectedCardIndex = null;
+
+                    let oldNext = p1NextCard;
+                    p1NextCard = p1Hand[usedIdx];
+                    p1Hand[usedIdx] = oldNext;
+                    renderPlayerHands();
+
+                    if (isSpell) castSpell(clickX, clickY, 'bottom', card);
+                    else spawnUnit(cardId, clickX, clickY, 'bottom');
+
+                    if (gameMode === 'online' && activeRoomId) {
+                        sendLobbyMsg({ to: '*', t: 'deploy', cardId: cardId, x: clickX, y: clickY, isSpell: isSpell });
+                    }
+                    return;
+                }
+
+                if (gameMode === 'pvp' && p2SelectedCardIndex !== null) {
+                    let cardId = p2Hand[p2SelectedCardIndex];
+                    let card = CARDS_DATABASE.find(c => c.id === cardId);
+                    if (p2Elixir < card.cost) { showDeploymentWarning("Yetersiz Eliksir!"); return; }
+
+                    let isSpell = card.type === 'spell';
+                    if (!isSpell) {
+                        let isRiverOrBridge = (clickY >= riverTop && clickY <= riverBottom) || 
+                                              ((clickY >= riverTop - 25 && clickY <= riverBottom + 25) && ((clickX >= bridge1XMin && clickX <= bridge1XMax) || (clickX >= bridge2XMin && clickX <= bridge2XMax)));
+                        if (isRiverOrBridge) {
+                            showDeploymentWarning("Köprüye ve suya karakter koyulamaz!");
+                            return;
+                        }
+                        if (clickY > riverTop) {
+                            showDeploymentWarning("Sadece kendi sahana bırakabilirsin!");
+                            return;
+                        }
+                    }
+
+                    p2Elixir -= card.cost;
+                    let usedIdx = p2SelectedCardIndex;
+                    p2SelectedCardIndex = null;
+
+                    let oldNext = p2NextCard;
+                    p2NextCard = p2Hand[usedIdx];
+                    p2Hand[usedIdx] = oldNext;
+                    renderPlayerHands();
+
+                    if (isSpell) castSpell(clickX, clickY, 'top', card);
+                    else spawnUnit(cardId, clickX, clickY, 'top');
+                    return;
+                }
+            };
+
+            canvas.addEventListener('click', (e) => handleDeploy(e.clientX, e.clientY));
+            canvas.addEventListener('touchstart', (e) => {
+                if (e.touches && e.touches.length > 0) handleDeploy(e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: true });
+        }
+
+        function spawnUnit(cardId, x, y, side) {
+            let proto = CARDS_DATABASE.find(c => c.id === cardId);
+            if (!proto || proto.type !== 'troop') return;
+            let scale = 1 + (proto.level - 1) * 0.15;
+            let hp = Math.round(proto.baseHp * scale), dmg = Math.round(proto.baseDamage * scale);
+
+            if (proto.id === 'pekkafamily') {
+                let pekkaProto = CARDS_DATABASE.find(c => c.id === 'pekka');
+                let miniProto = CARDS_DATABASE.find(c => c.id === 'minipekka');
+                units.push({
+                    cardId: 'pekka', name: 'P.E.K.K.A', side, x: x - 12, y,
+                    hp: Math.round(pekkaProto.baseHp * scale), maxHp: Math.round(pekkaProto.baseHp * scale),
+                    damage: Math.round(pekkaProto.baseDamage * scale), range: pekkaProto.range, speed: pekkaProto.speed,
+                    attackSpeed: pekkaProto.attackSpeed, attackCooldown: 0, radius: 14, icon: pekkaProto.icon, short: 'PEK', color: pekkaProto.color, isFlying: false
+                });
+                units.push({
+                    cardId: 'minipekka', name: 'Mini P.E.K.K.A', side, x: x + 12, y,
+                    hp: Math.round(miniProto.baseHp * scale), maxHp: Math.round(miniProto.baseHp * scale),
+                    damage: Math.round(miniProto.baseDamage * scale), range: miniProto.range, speed: miniProto.speed,
+                    attackSpeed: miniProto.attackSpeed, attackCooldown: 0, radius: 11, icon: miniProto.icon, short: 'MPK', color: miniProto.color, isFlying: false
+                });
+                return;
+            }
+
+            let count = proto.count || 1;
+            for (let i = 0; i < count; i++) {
+                let offsetX = (i - Math.floor(count / 2)) * 14;
+                let offsetY = (i % 2 === 0 ? 1 : -1) * 8;
+                units.push({
+                    cardId: proto.id, name: proto.name, side, x: x + offsetX, y: y + offsetY,
+                    hp, maxHp: hp, damage: dmg, range: proto.range, speed: proto.speed,
+                    attackSpeed: proto.attackSpeed, attackCooldown: 0, radius: 12, icon: proto.icon, short: proto.short, color: proto.color, isFlying: proto.isFlying
+                });
+            }
+        }
+
+        function castSpell(x, y, side, card) {
+            let scale = 1 + (card.level - 1) * 0.15;
+            let dmg = Math.round(card.baseDamage * scale);
+
+            if (card.id === 'goblinbarrel') {
+                let gob = CARDS_DATABASE.find(c => c.id === 'goblin');
+                for (let i = 0; i < 3; i++) {
+                    let angle = (i / 3) * Math.PI * 2;
+                    units.push({
+                        cardId: 'goblin', name: 'Goblin', side, x: x + Math.cos(angle)*12, y: y + Math.sin(angle)*12,
+                        hp: Math.round(gob.baseHp * scale), maxHp: Math.round(gob.baseHp * scale),
+                        damage: Math.round(gob.baseDamage * scale), range: gob.range, speed: gob.speed,
+                        attackSpeed: gob.attackSpeed, attackCooldown: 0, radius: 11, icon: gob.icon, short: 'GOB', color: gob.color, isFlying: false
+                    });
+                }
+                return;
+            }
+
+            if (card.id === 'arrowswarm') {
+                for (let i = 0; i < (card.count || 50); i++) {
+                    let angle = Math.random() * Math.PI * 2;
+                    let r = Math.random() * card.radius;
+                    projectiles.push({
+                        type: 'arrow', x: canvas.width / 2,
+                        y: side === 'bottom' ? canvas.height - 30 : 30, targetX: x + Math.cos(angle) * r, targetY: y + Math.sin(angle) * r,
+                        speed: 9 + Math.random() * 3, damage: 1, radius: 10, side
+                    });
+                }
+                return;
+            }
+
+            if (card.id === 'fireswarm') {
+                for (let i = 0; i < (card.count || 5); i++) {
+                    let angle = (i / 5) * Math.PI * 2;
+                    let r = Math.random() * (card.radius * 0.7);
+                    projectiles.push({
+                        type: 'fireball', x: canvas.width / 2,
+                        y: side === 'bottom' ? canvas.height - 30 : 30, targetX: x + Math.cos(angle) * r, targetY: y + Math.sin(angle) * r,
+                        speed: 6, damage: Math.round(dmg / 2), radius: 35, side
+                    });
+                }
+                return;
+            }
+
+            projectiles.push({
+                type: 'fireball', x: canvas.width / 2,
+                y: side === 'bottom' ? canvas.height - 30 : 30, targetX: x, targetY: y,
+                speed: 6, damage: dmg, radius: card.radius, side
+            });
+        }
+
+        let aiSpawnTimer = 0;
+        function updateAI(dt) {
+            if (gameMode !== 'pve') return;
+            let regenMult = selectedDifficulty === 'zor' ? 1.25 : selectedDifficulty === 'orta' ? 1.0 : 0.8;
+            p2Elixir = Math.min(maxElixir, p2Elixir + elixirRegenRate * dt * regenMult);
+
+            aiSpawnTimer += dt;
+            let spawnInterval = selectedDifficulty === 'zor' ? 2.3 : selectedDifficulty === 'orta' ? 3.5 : 4.8;
+
+            if (aiSpawnTimer >= spawnInterval && p2Elixir >= 3) {
+                aiSpawnTimer = 0;
+                let availableCards = p2Hand.filter(cardId => {
+                    let c = CARDS_DATABASE.find(card => card.id === cardId);
+                    return c && c.cost <= p2Elixir;
+                });
+                if (availableCards.length > 0) {
+                    let cardId = availableCards[Math.floor(Math.random() * availableCards.length)];
+                    let card = CARDS_DATABASE.find(c => c.id === cardId);
+                    p2Elixir -= card.cost;
+
+                    let idx = p2Hand.indexOf(cardId);
+                    let oldNext = p2NextCard;
+                    p2NextCard = p2Hand[idx];
+                    p2Hand[idx] = oldNext;
+
+                    let spawnX = Math.random() < 0.5 ? canvas.width * 0.25 : canvas.width * 0.75;
+                    let spawnY = card.type === 'spell' ? canvas.height * 0.7 : canvas.height * 0.25;
+
+                    if (card.type === 'spell') castSpell(spawnX, spawnY, 'top', card);
+                    else spawnUnit(cardId, spawnX, spawnY, 'top');
+                }
+            }
+        }
+
+        function gameLoop(timestamp) {
+            if (gameState !== 'battle') return;
+            let dt = (timestamp - lastFrameTime) / 1000;
+            if (dt > 0.1) dt = 0.1;
+            lastFrameTime = timestamp;
+
+            update(dt);
+            render();
+            gameLoopReq = requestAnimationFrame(gameLoop);
+        }
+
+        function update(dt) {
+            p1Elixir = Math.min(maxElixir, p1Elixir + elixirRegenRate * dt);
+            if (gameMode === 'pvp') {
+                p2Elixir = Math.min(maxElixir, p2Elixir + elixirRegenRate * dt);
+                document.getElementById('p2ElixirFill').style.width = `${(p2Elixir / maxElixir) * 100}%`;
+                document.getElementById('p2ElixirText').innerText = p2Elixir.toFixed(1);
+            }
+            document.getElementById('p1ElixirFill').style.width = `${(p1Elixir / maxElixir) * 100}%`;
+            document.getElementById('p1ElixirText').innerText = p1Elixir.toFixed(1);
+
+            updateAI(dt);
+
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                let dx = p.targetX - p.x, dy = p.targetY - p.y, dist = Math.hypot(dx, dy);
+                if (dist < p.speed) {
+                    if (p.type === 'fireball') createExplosion(p.targetX, p.targetY, p.radius, p.damage, p.side);
+                    else if (p.type === 'arrow') applyArrowDamage(p.targetX, p.targetY, p.radius, p.damage, p.side);
+                    projectiles.splice(i, 1);
+                } else {
+                    p.x += (dx / dist) * p.speed; p.y += (dy / dist) * p.speed;
+                }
+            }
+
+            for (let i = 0; i < units.length; i++) {
+                for (let j = i + 1; j < units.length; j++) {
+                    let u1 = units[i], u2 = units[j];
+                    let dx = u2.x - u1.x, dy = u2.y - u1.y, dist = Math.hypot(dx, dy);
+                    let minDist = u1.radius + u2.radius;
+                    if (dist < minDist && dist > 0) {
+                        let overlap = (minDist - dist) / 2;
+                        let nx = dx / dist, ny = dy / dist;
+                        u1.x -= nx * overlap; u1.y -= ny * overlap;
+                        u2.x += nx * overlap; u2.y += ny * overlap;
+                    }
+                }
+            }
+
+            towers.forEach(t => {
+                units.forEach(u => {
+                    let dx = u.x - t.x, dy = u.y - t.y, dist = Math.hypot(dx, dy);
+                    let minDist = u.radius + t.radius;
+                    if (dist < minDist && dist > 0) {
+                        let overlap = minDist - dist;
+                        let nx = dx / dist, ny = dy / dist;
+                        u.x += nx * overlap; u.y += ny * overlap;
+                    }
+                });
+            });
+
+            let riverTop = canvas.height * 0.44;
+            let riverBottom = canvas.height * 0.56;
+            let b1Min = canvas.width * 0.16, b1Max = canvas.width * 0.34;
+            let b2Min = canvas.width * 0.66, b2Max = canvas.width * 0.84;
+
+            let bridge1Units = units.filter(u => !u.isFlying && u.x >= b1Min && u.x <= b1Max && u.y >= riverTop - 12 && u.y <= riverBottom + 12);
+            let bridge2Units = units.filter(u => !u.isFlying && u.x >= b2Min && u.x <= b2Max && u.y >= riverTop - 12 && u.y <= riverBottom + 12);
+
+            let bridge1X = (b1Min + b1Max) / 2;
+            let bridge2X = (b2Min + b2Max) / 2;
+
+            for (let i = units.length - 1; i >= 0; i--) {
+                let u = units[i];
+                u.attackCooldown = Math.max(0, u.attackCooldown - dt);
+                let target = findNearestTarget(u);
+
+                if (target) {
+                    let destX = target.x, destY = target.y;
+
+                    if (!u.isFlying) {
+                        let isU_South = u.y > riverBottom;
+                        let isTarget_North = target.y < riverTop;
+                        let isU_North = u.y < riverTop;
+                        let isTarget_South = target.y > riverBottom;
+
+                        if ((isU_South && isTarget_North) || (isU_North && isTarget_South)) {
+                            let chosenBridgeX = bridge1X;
+                            let b1Count = bridge1Units.length;
+                            let b2Count = bridge2Units.length;
+
+                            if (b1Count >= 4 && b2Count < 4) {
+                                chosenBridgeX = bridge2X;
+                            } else if (b2Count >= 4 && b1Count < 4) {
+                                chosenBridgeX = bridge1X;
+                            } else {
+                                let b1Dist = Math.abs(u.x - bridge1X);
+                                let b2Dist = Math.abs(u.x - bridge2X);
+                                chosenBridgeX = b1Dist < b2Dist ? bridge1X : bridge2X;
+                            }
+
+                            if (Math.abs(u.x - chosenBridgeX) > 10) {
+                                destX = chosenBridgeX;
+                                destY = isU_South ? riverBottom + 16 : riverTop - 16;
+                            } else {
+                                destX = chosenBridgeX;
+                                destY = isU_South ? riverTop - 10 : riverBottom + 10;
+                            }
+                        }
+                    }
+
+                    let dx = destX - u.x, dy = destY - u.y, dist = Math.hypot(dx, dy);
+                    let directDist = Math.hypot(target.x - u.x, target.y - u.y);
+                    let effectiveRange = u.range + (target.radius || 15);
+
+                    if (directDist <= effectiveRange) {
+                        if (u.attackCooldown === 0) {
+                            u.attackCooldown = u.attackSpeed;
+                            target.hp -= u.damage;
+                            addFloatingText(target.x, target.y, `-${u.damage}`, u.side === 'bottom' ? '#3b82f6' : '#ef4444');
+                            if (target.type && target.hp <= 0) handleTowerDestroyed(target);
+                        }
+                    } else if (dist > 1) {
+                        let nextX = u.x + (dx / dist) * u.speed * 60 * dt;
+                        let nextY = u.y + (dy / dist) * u.speed * 60 * dt;
+
+                        if (!u.isFlying) {
+                            let inBridge1 = (u.x >= b1Min && u.x <= b1Max) || (nextX >= b1Min && nextX <= b1Max);
+                            let inBridge2 = (u.x >= b2Min && u.x <= b2Max) || (nextX >= b2Min && nextX <= b2Max);
+
+                            if (!inBridge1 && !inBridge2) {
+                                if (u.y <= riverTop && nextY > riverTop) nextY = riverTop;
+                                if (u.y >= riverBottom && nextY < riverBottom) nextY = riverBottom;
+                                if (nextY > riverTop && nextY < riverBottom) nextY = u.y < riverTop ? riverTop : riverBottom;
+                            }
+                        }
+
+                        u.x = nextX;
+                        u.y = nextY;
+                    }
+                }
+
+                if (!u.isFlying) {
+                    let inB1 = (u.x >= b1Min && u.x <= b1Max);
+                    let inB2 = (u.x >= b2Min && u.x <= b2Max);
+                    if (!inB1 && !inB2 && u.y > riverTop && u.y < riverBottom) {
+                        u.y = u.y < (riverTop + riverBottom) / 2 ? riverTop : riverBottom;
+                    }
+                }
+
+                if (u.hp <= 0) {
+                    createDeathParticles(u.x, u.y, u.color);
+                    units.splice(i, 1);
+                }
+            }
+
+            towers.forEach(t => {
+                if (t.hp <= 0) return;
+                t.attackCooldown = Math.max(0, t.attackCooldown - dt);
+                if (t.attackCooldown === 0) {
+                    let enemyUnit = units.find(u => u.side !== t.side && Math.hypot(u.x - t.x, u.y - t.y) <= t.range);
+                    if (enemyUnit) {
+                        t.attackCooldown = t.attackSpeed;
+                        enemyUnit.hp -= t.damage;
+                        addFloatingText(enemyUnit.x, enemyUnit.y, `-${t.damage}`, '#f59e0b');
+                    }
+                }
+            });
+            towers = towers.filter(t => t.hp > 0);
+        }
+
+        function findNearestTarget(unit) {
+            let enemySide = unit.side === 'bottom' ? 'top' : 'bottom';
+            let minDistance = Infinity;
+            let bestTarget = null;
+
+            let aliveTowers = towers.filter(t => t.side === enemySide && t.hp > 0);
+            let princessTowers = aliveTowers.filter(t => t.type === 'princess');
+            let targetableTowers = princessTowers.length > 0 ? princessTowers : aliveTowers;
+
+            targetableTowers.forEach(t => {
+                let dist = Math.hypot(t.x - unit.x, t.y - unit.y);
+                if (dist < minDistance) { minDistance = dist; bestTarget = t; }
+            });
+
+            units.filter(u => u.side === enemySide).forEach(u => {
+                let dist = Math.hypot(u.x - unit.x, u.y - unit.y);
+                if (dist < minDistance) { minDistance = dist; bestTarget = u; }
+            });
+
+            return bestTarget;
+        }
+
+        function createExplosion(x, y, radius, damage, side) {
+            let enemySide = side === 'bottom' ? 'top' : 'bottom';
+            towers.forEach(t => {
+                if (t.side === enemySide && Math.hypot(t.x - x, t.y - y) <= radius + t.radius) {
+                    t.hp -= damage;
+                    addFloatingText(t.x, t.y, `-${damage}`, '#ef4444');
+                    if (t.hp <= 0) handleTowerDestroyed(t);
+                }
+            });
+            units.forEach(u => {
+                if (u.side === enemySide && Math.hypot(u.x - x, u.y - y) <= radius + u.radius) {
+                    u.hp -= damage;
+                    addFloatingText(u.x, u.y, `-${damage}`, '#ef4444');
+                }
+            });
+            for (let i = 0; i < 18; i++) {
+                particles.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, radius: Math.random() * 5 + 2, color: '#f97316', alpha: 1, decay: 0.04 });
+            }
+        }
+
+        function applyArrowDamage(x, y, radius, damage, side) {
+            let enemySide = side === 'bottom' ? 'top' : 'bottom';
+            towers.forEach(t => {
+                if (t.side === enemySide && Math.hypot(t.x - x, t.y - y) <= radius + t.radius) {
+                    t.hp -= damage;
+                    if (t.hp <= 0) handleTowerDestroyed(t);
+                }
+            });
+            units.forEach(u => {
+                if (u.side === enemySide && Math.hypot(u.x - x, u.y - y) <= radius + u.radius) {
+                    u.hp -= damage;
+                }
+            });
+        }
+
+        function handleTowerDestroyed(tower) {
+            if (tower.side === 'top') {
+                p1Crowns++;
+                document.getElementById('bottomCrownsCount').innerText = `🏆 ${p1Crowns}`;
+                if (tower.type === 'king' || p1Crowns >= 3) triggerEndGame('p1');
+            } else {
+                p2Crowns++;
+                document.getElementById('topCrownsCount').innerText = `🏆 ${p2Crowns}`;
+                if (tower.type === 'king' || p2Crowns >= 3) triggerEndGame('p2');
+            }
+        }
+
+        function createDeathParticles(x, y, color) {
+            for (let i = 0; i < 6; i++) {
+                particles.push({ x, y, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, radius: Math.random() * 3 + 1, color, alpha: 1, decay: 0.05 });
+            }
+        }
+
+        function addFloatingText(x, y, text, color) {
+            floatingTexts.push({ x, y, text, color, alpha: 1, vy: -1.2 });
+        }
+
+        function triggerEndGame(winner) {
+            gameState = 'result';
+            if (timerInterval) clearInterval(timerInterval);
+            if (gameLoopReq) cancelAnimationFrame(gameLoopReq);
+
+            document.getElementById('battleScreen').classList.add('hidden');
+            document.getElementById('resultScreen').classList.remove('hidden');
+
+            let titleEl = document.getElementById('resultTitle');
+            let subEl = document.getElementById('resultSubtitle');
+            let iconEl = document.getElementById('resultIcon');
+
+            let isP1Win = winner === 'p1';
+            let bonusGold = 0;
+
+            if (isP1Win) {
+                winStreak++;
+                totalWins++;
+                updateUnlockProgressUI();
+                if (winStreak % 5 === 0) bonusGold += 1000;
+            } else {
+                winStreak = 0;
+            }
+
+            let goldReward = (isP1Win ? 160 + p1Crowns * 50 : 60) + bonusGold;
+            playerGold += goldReward;
+
+            let streakMsg = winStreak > 0 ? ` (Galibiyet Serisi: ${winStreak})` : "";
+            if (isP1Win) {
+                titleEl.innerText = gameMode === 'pvp' ? `${p1Name} KAZANDI!` : "ZAFER!";
+                titleEl.className = "text-xl font-black tracking-wider text-amber-400 text-glow";
+                subEl.innerText = `Harika mücadele! ${goldReward} altın kazandın.${streakMsg}`;
+                iconEl.innerText = "👑";
+            } else {
+                titleEl.innerText = gameMode === 'pvp' ? `${p2Name} KAZANDI!` : "YENİLGİ...";
+                titleEl.className = "text-xl font-black tracking-wider text-rose-500";
+                subEl.innerText = `Kulelerin yıkıldı. Teselli ödülü: ${goldReward} altın.`;
+                iconEl.innerText = "💀";
+            }
+
+            document.getElementById('resCrowns').innerText = `${p1Crowns} - ${p2Crowns}`;
+            document.getElementById('resGoldEarned').innerText = `+${goldReward} 🪙`;
+            let elapsed = 180 - matchTimerSeconds;
+            let mins = Math.floor(elapsed / 60);
+            let secs = elapsed % 60;
+            document.getElementById('resTime').innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function endGameByTimeout() {
+            if (p1Crowns >= p2Crowns) triggerEndGame('p1');
+            else triggerEndGame('p2');
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let w = canvas.width;
+            let h = canvas.height;
+            let mapObj = MAPS_DATABASE.find(m => m.id === selectedMap) || MAPS_DATABASE[0];
+
+            ctx.fillStyle = mapObj.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.fillStyle = mapObj.river;
+            ctx.fillRect(0, h * 0.44, w, h * 0.12);
+
+            const drawBridge = (bx, by, bw, bh) => {
+                ctx.fillStyle = mapObj.bridge;
+                ctx.fillRect(bx, by, bw, bh);
+                ctx.strokeStyle = '#38220f';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(bx, by, bw, bh);
+                ctx.fillStyle = '#291605';
+                for (let px = bx + 6; px < bx + bw; px += 10) {
+                    ctx.fillRect(px, by, 3, bh);
+                }
+            };
+            drawBridge(w * 0.16, h * 0.42, w * 0.18, h * 0.16);
+            drawBridge(w * 0.66, h * 0.42, w * 0.18, h * 0.16);
+
+            ctx.strokeStyle = '#ffffff25';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 6]);
+            ctx.beginPath();
+            ctx.moveTo(0, h / 2);
+            ctx.lineTo(w, h / 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            towers.forEach(t => {
+                ctx.save();
+                ctx.translate(t.x, t.y);
+                ctx.fillStyle = t.side === 'bottom' ? '#2563eb' : '#dc2626';
+                ctx.beginPath();
+                ctx.arc(0, 0, t.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                ctx.font = '16px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(t.type === 'king' ? '👑' : '🏰', 0, 1);
+
+                let barW = 36, barH = 4;
+                ctx.fillStyle = '#000000aa';
+                ctx.fillRect(-barW / 2, -t.radius - 9, barW, barH);
+                let hpPct = Math.max(0, t.hp / t.maxHp);
+                ctx.fillStyle = t.side === 'bottom' ? '#22c55e' : '#f43f5e';
+                ctx.fillRect(-barW / 2, -t.radius - 9, barW * hpPct, barH);
+                ctx.restore();
+            });
+
+            units.forEach(u => {
+                ctx.save();
+                ctx.translate(u.x, u.y);
+
+                if (u.isFlying) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                    ctx.beginPath();
+                    ctx.ellipse(0, u.radius + 4, u.radius * 0.7, 3, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.fillStyle = u.color || '#475569';
+                ctx.beginPath();
+                ctx.arc(0, 0, u.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = u.side === 'bottom' ? '#60a5fa' : '#f87171';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                ctx.font = '14px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(u.icon || u.short || '⚔️', 0, 1);
+
+                let barW = 26, barH = 3.5;
+                ctx.fillStyle = '#000000aa';
+                ctx.fillRect(-barW / 2, -u.radius - 7, barW, barH);
+                let hpPct = Math.max(0, u.hp / u.maxHp);
+                ctx.fillStyle = u.side === 'bottom' ? '#22c55e' : '#ef4444';
+                ctx.fillRect(-barW / 2, -u.radius - 7, barW * hpPct, barH);
+                ctx.restore();
+            });
+
+            projectiles.forEach(p => {
+                ctx.save();
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#fef08a';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            particles.forEach((pt, i) => {
+                pt.x += pt.vx; pt.y += pt.vy; pt.alpha -= pt.decay;
+                if (pt.alpha <= 0) particles.splice(i, 1);
+                else {
+                    ctx.save();
+                    ctx.globalAlpha = pt.alpha;
+                    ctx.fillStyle = pt.color;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            });
+
+            floatingTexts.forEach((ft, i) => {
+                ft.y += ft.vy; ft.alpha -= 0.025;
+                if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+                else {
+                    ctx.save();
+                    ctx.globalAlpha = ft.alpha;
+                    ctx.fillStyle = ft.color;
+                    ctx.font = 'bold 11px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(ft.text, ft.x, ft.y);
+                    ctx.restore();
+                }
+            });
+        }
+    </script>
+<script>
+if(!CanvasRenderingContext2D.prototype.roundRect)CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){var a=[].concat(r===undefined?0:r),tl=a[0],tr=a.length>1?a[1]:tl,br=a.length>2?a[2]:tl,bl=a.length>3?a[3]:tr;this.moveTo(x+tl,y);this.lineTo(x+w-tr,y);this.arcTo(x+w,y,x+w,y+tr,tr);this.lineTo(x+w,y+h-br);this.arcTo(x+w,y+h,x+w-br,y+h,br);this.lineTo(x+bl,y+h);this.arcTo(x,y+h,x,y+h-bl,bl);this.lineTo(x,y+tl);this.arcTo(x,y,x+tl,y,tl);this.closePath()};
+var PAD=(function(){
+ var P={on:false,b:[],pb:[],ax:[0,0,0,0],f:null,rt:0,rs:0,gp:null,mx:null,my:null,lt:0};
+ var bd=document.createElement('div');bd.style.cssText='position:fixed;left:50%;bottom:8px;transform:translateX(-50%);padding:5px 12px;border-radius:12px;background:rgba(0,0,0,.8);color:#fff;font:13px system-ui,sans-serif;z-index:99999;pointer-events:none;opacity:0;transition:opacity .4s';
+ document.body.appendChild(bd);
+ P.say=function(t){bd.textContent=t;bd.style.opacity=1;clearTimeout(P.st);P.st=setTimeout(function(){bd.style.opacity=0},3500)};
+ var dz=function(v){return Math.abs(v)<.2?0:v};
+ P.poll=function(){
+  var gs=navigator.getGamepads?navigator.getGamepads():[],g=null,i;
+  for(i=0;i<gs.length;i++)if(gs[i]&&gs[i].connected){g=gs[i];break}
+  if(!g){if(P.on){P.on=false;P.say('Kumanda bağlantısı koptu')}return false}
+  if(!P.on){P.on=true;P.say('PlayStation kumandası bağlı')}
+  P.gp=g;P.pb=P.b;P.b=[];for(i=0;i<g.buttons.length;i++)P.b[i]=!!(g.buttons[i].pressed||g.buttons[i].value>.5);
+  P.ax=[dz(g.axes[0]||0),dz(g.axes[1]||0),dz(g.axes[2]||0),dz(g.axes[3]||0)];return true};
+ P.d=function(i){return !!P.b[i]};P.p=function(i){return !!P.b[i]&&!P.pb[i]};P.r=function(i){return !P.b[i]&&!!P.pb[i]};
+ P.dt=function(now){var d=Math.min(.05,(now-(P.lt||now))/1000);P.lt=now;return d};
+ P.rumble=function(ms,a,b){try{var g=P.gp;if(g&&g.vibrationActuator)g.vibrationActuator.playEffect('dual-rumble',{duration:ms,strongMagnitude:a||1,weakMagnitude:b||.5})}catch(e){}};
+ P.dir=function(now){var dx=0,dy=0;
+  if(P.p(14))dx=-1;else if(P.p(15))dx=1;else if(P.p(12))dy=-1;else if(P.p(13))dy=1;
+  else{var ax=P.ax[0],ay=P.ax[1];
+   if((Math.abs(ax)>.6||Math.abs(ay)>.6)&&now>P.rt){P.rt=now+(P.rs?140:380);P.rs=1;if(Math.abs(ax)>Math.abs(ay))dx=ax>0?1:-1;else dy=ay>0?1:-1}
+   else if(Math.abs(ax)<.4&&Math.abs(ay)<.4){P.rs=0;P.rt=0}}
+  return [dx,dy]};
+ P.nav=function(sel,now,back){
+  var els=[].slice.call(document.querySelectorAll(sel)).filter(function(e){var r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.disabled});
+  if(!els.length)return;
+  if(els.indexOf(P.f)<0)P.f=els[0];
+  var d=P.dir(now),dx=d[0],dy=d[1],f=P.f;
+  if(dx||dy){
+   if(f.tagName==='SELECT'&&dx){f.selectedIndex=Math.max(0,Math.min(f.options.length-1,f.selectedIndex+dx));f.dispatchEvent(new Event('input',{bubbles:true}));f.dispatchEvent(new Event('change',{bubbles:true}))}
+   else if(f.type==='range'&&dx){f.value=+f.value+dx*(+f.step||1)*Math.max(1,Math.round((f.max-f.min)/20));f.dispatchEvent(new Event('input',{bubbles:true}));f.dispatchEvent(new Event('change',{bubbles:true}))}
+   else{var r=f.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,best=null,bs=1e9;
+    els.forEach(function(e){if(e===f)return;var q=e.getBoundingClientRect(),x=q.left+q.width/2-cx,y=q.top+q.height/2-cy,al=dx?x*dx:y*dy,ac=Math.abs(dx?y:x);if(al>2){var s=al+ac*2;if(s<bs){bs=s;best=e}}});
+    if(best){P.f=best;f=best}}}
+  els.forEach(function(e){e.style.outline=e===P.f?'3px solid #ffd43b':''});
+  try{P.f.scrollIntoView({block:'nearest',inline:'nearest'})}catch(e){}
+  if(P.p(0)){if(P.f.tagName==='INPUT'&&P.f.type==='text')P.f.focus();else P.f.click()}
+  if(P.p(1)&&back)back()};
+ P.clear=function(){if(P.f){P.f.style.outline='';P.f=null}};
+ P.cur=function(){if(!P.cd){P.cd=document.createElement('div');P.cd.style.cssText='position:fixed;width:30px;height:30px;margin:-15px 0 0 -15px;border:3px solid #ffd43b;border-radius:50%;box-shadow:0 0 8px #000;z-index:99998;pointer-events:none;display:none';document.body.appendChild(P.cd)}return P.cd};
+ P.curAt=function(x,y,show){var c=P.cur();c.style.display=show?'block':'none';c.style.left=x+'px';c.style.top=y+'px'};
+ P.mov=function(r,dt,sp){if(P.mx===null||P.mx<r.left||P.mx>r.right||P.my<r.top||P.my>r.bottom){P.mx=r.left+r.width/2;P.my=r.top+r.height*.75}
+  P.mx=Math.max(r.left,Math.min(r.right,P.mx+P.ax[0]*dt*sp));P.my=Math.max(r.top,Math.min(r.bottom,P.my+P.ax[1]*dt*sp))};
+ P.run=function(fn){function f(t){requestAnimationFrame(f);try{if(P.poll())fn(t)}catch(e){if(!P.er){P.er=1;console.log('Kumanda hatası',e)}}}requestAnimationFrame(f)};
+ return P})();
+
+PAD.run(function(now){
+ var dt=PAD.dt(now),rules=document.getElementById('rulesModal');
+ if(rules&&rules.getBoundingClientRect().width>0){PAD.nav('#rulesModal button',now,function(){closeRulesModal()});return}
+ if(gameState!=='battle'){
+  PAD.curAt(0,0,false);
+  var scr=document.getElementById('resultScreen'),sel=(scr&&scr.getBoundingClientRect().width>0)?'#resultScreen':'#mainMenuScreen';
+  PAD.nav(sel+' button, '+sel+' select, '+sel+' input[type=text], '+sel+' input[type=range], '+sel+' [onclick]',now);
+  return}
+ PAD.clear();
+ var cv=document.getElementById('gameCanvas'),r=cv.getBoundingClientRect();
+ PAD.mov(r,dt,420);PAD.curAt(PAD.mx,PAD.my,true);
+ var hand=document.querySelectorAll('#p1HandContainer > *');
+ if(PAD.ci===undefined)PAD.ci=0;
+ function pick(i){PAD.ci=(i+4)%4;if(hand[PAD.ci]&&p1SelectedCardIndex!==PAD.ci)hand[PAD.ci].click()}
+ if(PAD.p(14)||PAD.p(4))pick(PAD.ci-1);
+ if(PAD.p(15)||PAD.p(5))pick(PAD.ci+1);
+ if(PAD.p(2))pick(0);if(PAD.p(3))pick(1);if(PAD.p(1)&&p1SelectedCardIndex!==null&&hand[p1SelectedCardIndex])hand[p1SelectedCardIndex].click();
+ if(PAD.p(0)||PAD.p(7)){
+  if(p1SelectedCardIndex===null)pick(PAD.ci);
+  else cv.dispatchEvent(new MouseEvent('click',{clientX:PAD.mx,clientY:PAD.my,bubbles:true}))}
+});
+
+</script>
+</body>
+</html>
