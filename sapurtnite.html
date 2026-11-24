@@ -309,7 +309,7 @@ const WP=[
 {n:'Hücum Tüfeği',rate:.1,mag:30,auto:1,spread:.012,rec:.012,ads:48,snd:[.06,1000],rl:1.5,d:24},
 {n:'Tabanca',rate:.2,mag:15,auto:0,spread:.007,rec:.02,ads:55,snd:[.07,750],rl:1.1,d:28},
 {n:'Keskin Nişancı',rate:1,mag:5,auto:0,spread:.02,rec:.06,ads:12,snd:[.16,380],rl:2.2,scope:1,d:110},
-{n:'SMG',rate:.065,mag:10,auto:9,spread:.15,rec:.9,ads:9,snd:[.05,10],rl:1.4,d:15},
+{n:'SMG',rate:.065,mag:35,auto:1,spread:.03,rec:.01,ads:50,snd:[.05,900],rl:1.4,d:15},
 {n:'Pompalı',rate:.9,mag:6,auto:0,spread:.04,rec:.07,ads:60,snd:[.18,300],rl:2,d:18,pel:8},
 {n:'Revolver',rate:.55,mag:6,auto:0,spread:.01,rec:.05,ads:50,snd:[.12,420],rl:2,d:62},
 {n:'Nişancı Tüfeği',rate:.35,mag:12,auto:0,spread:.006,rec:.03,ads:26,snd:[.1,600],rl:1.8,d:48}];
@@ -325,15 +325,21 @@ else{bx(.05,.085,.3,0,0,0,mBk);cy(.011,.2,0,.01,-.3,mSt)}
 const fm=new THREE.MeshBasicMaterial({color:0xffc94a,side:2,transparent:true,opacity:.9,depthWrite:false}),f=new THREE.Group();[0,Math.PI/2].forEach(a=>{const p=new THREE.Mesh(new THREE.PlaneGeometry(.16,.16),fm);p.rotation.z=a+.4;f.add(p)});f.position.set(0,.012,mz-.05);f.visible=false;g.add(f);
 g.userData={f,mz:new THREE.Vector3(0,.012,mz)};g.visible=false;C.add(g);return g}
 const guns=WP.map((w,i)=>mkGun(i));
-const HIP=new THREE.Vector3(.24,-.22,-.5),ADSP=new THREE.Vector3(0,-.1,-.38);
+const HIP=new THREE.Vector3(.24,-.22,-.5),ADSP=new THREE.Vector3(0,-.058,-.38);
 
 // 3. Şahıs Oyuncu Modeli (Arkadan bakış açısında görünür)
 const playerMesh=new THREE.Group();
 const pmBody=new THREE.Mesh(new THREE.BoxGeometry(.6,.8,.35),M(0x29b6f6,.6));pmBody.position.y=1.05;
 const pmHead=new THREE.Mesh(new THREE.BoxGeometry(.32,.32,.32),M(0xf1c27d,.6));pmHead.position.y=1.65;
-const pmLegL=new THREE.Mesh(new THREE.BoxGeometry(.22,.65,.24),M(0x263238,.7));pmLegL.position.set(-.15,.35,0);
-const pmLegR=new THREE.Mesh(new THREE.BoxGeometry(.22,.65,.24),M(0x263238,.7));pmLegR.position.set(.15,.35,0);
-playerMesh.add(pmBody,pmHead,pmLegL,pmLegR);
+const pmVisor=new THREE.Mesh(new THREE.BoxGeometry(.28,.1,.04),M(0x212121,.4));pmVisor.position.set(0,1.68,-.17);
+const lgG=new THREE.BoxGeometry(.22,.65,.24);lgG.translate(0,-.325,0);
+const pmLegL=new THREE.Mesh(lgG,M(0x263238,.7));pmLegL.position.set(-.15,.68,0);
+const pmLegR=new THREE.Mesh(lgG,M(0x263238,.7));pmLegR.position.set(.15,.68,0);
+const pmArm=new THREE.Group();pmArm.position.set(.4,1.3,0);
+const pmArmM=new THREE.Mesh(new THREE.BoxGeometry(.14,.14,.45),M(0x29b6f6,.6));pmArmM.position.set(-.06,-.02,-.2);
+const pmGun=new THREE.Mesh(new THREE.BoxGeometry(.07,.12,.6),M(0x1b1c1f,.4,.8));pmGun.position.set(-.06,.02,-.5);
+pmArm.add(pmArmM,pmGun);
+playerMesh.add(pmBody,pmHead,pmVisor,pmLegL,pmLegR,pmArm);
 playerMesh.visible=false;
 S.add(playerMesh);
 
@@ -357,13 +363,13 @@ function mark(){const h=$('hm');h.classList.add('s');setTimeout(()=>h.classList.
 function tryFire(){const W=WP[w];if(ph||reloading||tNow-lastShot<W.rate)return;if(mags[w]<=0){reload();return}
 mags[w]--;lastShot=tNow;shots++;kick=1;recP+=W.rec;snd(W.snd[0],W.snd[1]);
 const g=guns[w];g.userData.f.visible=true;setTimeout(()=>g.userData.f.visible=false,45);
-const scoped=W.scope&&adsT>.9,sp=W.spread*(adsT>.5?.3:1)*(scoped?.1:1)*(Math.hypot(vx,vz)>2?1.6:1);
+C.updateMatrixWorld(true);const scoped=W.scope&&adsT>.9,sp=W.spread*(adsT>.5?.3:1)*(scoped?.1:1)*(Math.hypot(vx,vz)>2?1.6:1);
 rc.setFromCamera(new THREE.Vector2((Math.random()-.5)*sp*2,(Math.random()-.5)*sp*2),C);
 const all=bm.concat([ground],em.filter(m=>m.userData.e.alive));
 const hs=rc.intersectObjects(all,false),h=hs[0];
 const end=h?h.point:rc.ray.at(200,new THREE.Vector3());
 C.updateMatrixWorld(true);
-const a=camMode===3?new THREE.Vector3(px,py+1.3,pz):g.localToWorld(g.userData.mz.clone());
+const a=fpv()?g.localToWorld(g.userData.mz.clone()):new THREE.Vector3(px-Math.sin(yaw)*.7+Math.cos(yaw)*.34,py+1.3,pz-Math.cos(yaw)*.7-Math.sin(yaw)*.34);
 const geo=new THREE.BufferGeometry().setFromPoints([a,end]);const ln=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffe082,transparent:true}));S.add(ln);tr.push({m:ln,l:.08});
 if(h){if(h.object.userData.e)hitE(h);else hole(h)}
 if(W.pel)for(let k=1;k<W.pel;k++)pellet();if(mags[w]<=0)reload();else hud()}
@@ -475,7 +481,8 @@ $('mb').onclick=()=>{$('mp').style.display='none';$('ov').style.display='flex'};
 $('sn').oninput=e=>sens=e.target.value/100;
 $('gc').onchange=e=>{grassOn=e.target.checked;gr.visible=grassOn};
 $('sd').onchange=e=>muted=!e.target.checked;
-let camMode=3;
+let camMode=+$('camv').value||1;
+function fpv(){return camMode===1||(WP[w].scope&&adsT>.85)}
 $('camv').onchange=e=>camMode=+e.target.value;
 
 function mmDraw(dt){mmT-=dt;if(mmT>0||st!='play')return;mmT=.15;const c=mm.getContext('2d'),s=120,k=s/(2*HM),X=v=>(v+HM)*k;c.clearRect(0,0,s,s);c.fillStyle='#3d6b30';c.fillRect(0,0,s,s);c.fillStyle='#c9a36b';POI.forEach(p=>c.fillRect(X(p[0])-2,X(p[1])-2,4,3));
@@ -555,17 +562,26 @@ for(let i=0;i<20;i++)mkE();
 for(let i=0;i<15;i++)mkKit();
 for(let i=0;i<90;i++)mkLoot();
 
+const cr=new THREE.Raycaster();
 function updateCamera(){
-  if(camMode===3){
+  const at=ph?0:adsT,fp=camMode===1||(!ph&&WP[w].scope&&at>.85);
+  if(fp){
+    playerMesh.visible=false;
+    C.position.set(px,py+1.7,pz);
+  }else{
     playerMesh.visible=true;
     playerMesh.position.set(px,py,pz);
     playerMesh.rotation.y=yaw;
-    const cp=Math.cos(pitch),sp=Math.sin(pitch);
-    const bx=px+Math.sin(yaw)*cp*4.2, bz=pz+Math.cos(yaw)*cp*4.2, by=py+2.0+sp*4.2;
-    C.position.set(bx,Math.max(py+.5,by),bz);
-  }else{
-    playerMesh.visible=false;
-    C.position.set(px,py+1.7,pz);
+    const spd=Math.min(1,Math.hypot(vx,vz)/6);
+    pmLegL.rotation.x=Math.sin(tNow*10)*.7*spd;pmLegR.rotation.x=-pmLegL.rotation.x;
+    pmArm.rotation.x=ph?0:pitch+recP;pmArm.visible=!ph&&!build;
+    const cp=Math.cos(pitch),sp=Math.sin(pitch),dist=lerp(4.2,2.4,at),sh=lerp(.55,.4,at);
+    const ox=px+Math.cos(yaw)*sh,oy=py+1.7,oz=pz-Math.sin(yaw)*sh;
+    const dx=Math.sin(yaw)*cp*dist,dy=-sp*dist+.35,dz=Math.cos(yaw)*cp*dist,len=Math.hypot(dx,dy,dz);
+    cr.set(new THREE.Vector3(ox,oy,oz),new THREE.Vector3(dx/len,dy/len,dz/len));cr.far=len+.3;
+    const hs=cr.intersectObjects(bm,false);
+    const f=(hs.length?Math.max(.4,hs[0].distance-.3):len)/len;
+    C.position.set(ox+dx*f,Math.max(py+.3,oy+dy*f),oz+dz*f);
   }
   C.rotation.y=yaw;
   C.rotation.x=pitch+recP;
