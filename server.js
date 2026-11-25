@@ -81,6 +81,8 @@ http.createServer((q,s)=>{
   return;
  }
 
+ if(u.pathname==='/adayis/liste.json'){s.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});s.end('{"karakter":[],"harita":[],"yan_karakterler":[],"araclar":[]}');return}
+
  // Yönlendirme (Routing) Kısmı
  let dosyaAdi = null;
  if (u.pathname === '/adayis' || u.pathname === '/adayis/' || u.pathname === '/adayis.html' || u.pathname === '/index.html') {
@@ -93,7 +95,7 @@ http.createServer((q,s)=>{
   dosyaAdi = 'sapurtnite.html';
  } else if (u.pathname === '/crownclash' || u.pathname === '/crownclash.html') {
   dosyaAdi = 'crownclash.html';
- } else {
+ } else if (u.pathname === '/') {
   s.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
   s.end(`<!doctype html>
 <html lang="tr">
@@ -185,6 +187,10 @@ http.createServer((q,s)=>{
     </div>
 </body>
 </html>`);
+  return;
+ } else {
+  s.writeHead(404, {'Content-Type': 'text/plain; charset=utf-8'});
+  s.end('bulunamadi');
   return;
  }
 
